@@ -82,23 +82,32 @@ function SplitWindowToR()
 endfunction
 
 function ReOpenRWin()
+    " The exit callback may have cleared R_bufnr while another callback still
+    " leaves SendCmdToR in its previous state. Treat that as a stopped session.
+    if !has_key(g:rplugin, "R_bufnr") || !bufexists(g:rplugin.R_bufnr)
+        let g:SendCmdToR = function('SendCmdToR_fake')
+        return 0
+    endif
+
     let wlist = nvim_list_wins()
     for wnr in wlist
         if nvim_win_get_buf(wnr) == g:rplugin.R_bufnr
             " The R buffer is visible
-            return
+            return 1
         endif
     endfor
     let edbuf = bufname("%")
     call SplitWindowToR()
     call nvim_win_set_buf(0, g:rplugin.R_bufnr)
     exe "sbuffer " . edbuf
+    return 1
 endfunction
 
 function StartR_InBuffer()
     if string(g:SendCmdToR) != "function('SendCmdToR_fake')"
-        call ReOpenRWin()
-        return
+        if ReOpenRWin()
+            return
+        endif
     endif
 
     let g:SendCmdToR = function('SendCmdToR_NotYet')
