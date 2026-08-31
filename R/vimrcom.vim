@@ -83,7 +83,9 @@ function ROnJobExit(job_id, stts)
     if key != "Job"
         let g:rplugin.jobs[key] = "no"
     endif
-    if a:stts != 0
+    " Closing R's terminal sends it SIGHUP (128 + 1). That is an expected exit,
+    " not an error worth showing to the user.
+    if a:stts != 0 && !(key ==# 'R' && a:stts == 129)
         call RWarningMsg('"' . key . '"' . ' exited with status ' . a:stts)
     endif
     if key ==# 'R'
