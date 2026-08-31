@@ -51,14 +51,15 @@ endfunction
 
 function CloseRTerm()
     if has_key(g:rplugin, "R_bufnr")
-        try
-            " R migh have been killed by closing the terminal buffer with the :q command
+        " R might have been killed by closing the terminal buffer with :q.
+        " Neovim 0.12 raises E86 if :sbuffer targets a deleted buffer, so do
+        " not attempt to reopen it unless it still exists.
+        if bufexists(g:rplugin.R_bufnr)
             exe "sbuffer " . g:rplugin.R_bufnr
-        catch /E94/
-        endtry
-        if g:R_close_term && g:rplugin.R_bufnr == bufnr("%")
-            startinsert
-            call feedkeys(' ')
+            if g:R_close_term && g:rplugin.R_bufnr == bufnr("%")
+                startinsert
+                call feedkeys(' ')
+            endif
         endif
         unlet g:rplugin.R_bufnr
     endif
