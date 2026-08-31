@@ -1162,9 +1162,10 @@ void update_inst_libs(void) {
         if (d) {
             while ((dir = readdir(d)) != NULL) {
 #ifdef _DIRENT_HAVE_D_TYPE
-                if (dir->d_name[0] != '.' && dir->d_type == DT_DIR) {
+                if (dir->d_name[0] != '.' && dir->d_type == DT_DIR &&
+                    strcmp(dir->d_name, "_cache") != 0) {
 #else
-                if (dir->d_name[0] != '.') {
+                if (dir->d_name[0] != '.' && strcmp(dir->d_name, "_cache") != 0) {
 #endif
                     il = instlibs;
                     r = 0;
