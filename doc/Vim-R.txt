@@ -1579,7 +1579,8 @@ colorscheme: the levels 1 and 2 are moved 45% of the way and the level 3 only
 18%. Hence, in a light colorscheme the level 3 really is lighter than the
 levels 1 and 2, while in a dark one it is darker; in both, it is the level
 that recedes. On a terminal with 256 colors, the palette index is moved along
-the axes of the xterm color cube, which preserves the hue too.
+the axes of the xterm color cube, which preserves the hue too, or along the
+grayscale ramp when `Comment` is a gray and has no hue to preserve.
 
 To derive the colors from another highlight group, or to change how far they
 are moved, put in your |vimrc|:
@@ -2806,8 +2807,11 @@ See also: |R_source|.
    highlight groups Note_1, Note_2 and Note_3 are computed from the color of
    `Comment` and from the foreground of `Normal`, and recomputed whenever the
    colorscheme changes, so that the notes are emphasized discreetly and in
-   harmony with the theme. A definition of your own in the |vimrc| is never
-   overridden and also survives a change of colorscheme. New options:
+   harmony with the theme. Without 'termguicolors', the palette index walks
+   the axes of the xterm color cube, which keeps the hue, or the grayscale
+   ramp when `Comment` is a gray, so that comments with no hue do not acquire
+   one. A definition of your own in the |vimrc| is never overridden and also
+   survives a change of colorscheme. New options:
    R_note_hl, R_note_hl_base, R_note_hl_amount and R_note_hl_amount3. See
    |R-note-comments|.
  * Walk the hierarchy that the note comments build, and list it:

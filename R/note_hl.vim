@@ -99,9 +99,28 @@ function s:Hex2Cterm(hex)
     return best
 endfunction
 
-" Move a palette index along the axes of the 6x6x6 cube, which is the only way
-" of keeping the hue: looking for the nearest RGB turns the navy #003460 of
-" peachpuff into 23 (#005f5f, teal). f > 0 lightens, f < 0 darkens.
+" A gray has no hue to keep and no axis to move along. The tolerance is wider
+" than the 10 units between two entries of the grayscale ramp, so that a gray
+" rounded to a neighbor still counts, and narrower than the 40 units between
+" two levels of the cube, so that a color which really occupies another level
+" on one axis, pale as it may be, is still treated as having a hue.
+function s:Gray(hex)
+    let c = s:Hex2RGB(a:hex)
+    return max(c) - min(c) <= 24
+endfunction
+
+" The grayscale ramp is where a gray has to stay: in the cube the three axes
+" round independently, and one axis moving alone is a hue.
+function s:Hex2Gray(hex)
+    let c = s:Hex2RGB(a:hex)
+    let v = (c[0] + c[1] + c[2]) / 3.0
+    return 232 + s:Clamp(float2nr(round((v - 8) / 10.0)), 0, 23)
+endfunction
+
+" Move a palette index along the axes of the 6x6x6 cube, or along the grayscale
+" ramp, which is the only way of keeping the hue: looking for the nearest RGB
+" turns the navy #003460 of peachpuff into 23 (#005f5f, teal). f > 0 lightens,
+" f < 0 darkens.
 function s:CtermShift(idx, f)
     let n = a:idx + 0
     if n < 0
@@ -127,10 +146,14 @@ function s:CtermShift(idx, f)
         let res = 16 + out[0] * 36 + out[1] * 6 + out[2]
     endif
     " Saturated or very dark colors cannot move along the cube: force one step,
-    " otherwise the three levels would share the same palette entry.
+    " otherwise the three levels would share the same palette entry. The step
+    " may not leave the ramp for the cube nor the other way round, which would
+    " jump from one end of the palette to the other (231 is white, 232 black).
     if res == n
         let alt = a:f > 0 ? n + 1 : n - 1
-        let res = (alt >= 16 && alt <= 255) ? alt : n
+        let lo = n >= 232 ? 232 : 16
+        let hi = n >= 232 ? 255 : 231
+        let res = (alt >= lo && alt <= hi) ? alt : n
     endif
     return res
 endfunction
@@ -312,10 +335,16 @@ function RNoteHlApply()
     " An explicit index of the 256 color palette is what the author of the
     " colorscheme chose; an index below 16 only names an entry whose RGB is
     " unknown, so the gui color, if there is one, is the better starting point.
-    if cterm >= 16
+    " A gray is the exception: the terminal paints an achromatic entry whatever
+    " the gui color says, and only the ramp can be walked without a hue
+    " appearing, so the conventional RGB of the entry decides.
+    let chex = cterm >= 0 ? s:Cterm2Hex(cterm) : ''
+    if chex != '' && s:Gray(chex)
+        let cbase = s:Hex2Gray(chex)
+    elseif cterm >= 16
         let cbase = cterm
     elseif gui != ''
-        let cbase = s:Hex2Cterm(gui)
+        let cbase = s:Gray(gui) ? s:Hex2Gray(gui) : s:Hex2Cterm(gui)
     else
         let cbase = cterm
     endif
@@ -331,7 +360,9 @@ function RNoteHlApply()
     let cs = s:CtermSep(cbase, up * g:R_note_hl_amount)
     let cw = s:CtermShift(cbase, up * g:R_note_hl_amount3)
     if cw == cs
-        let cw = cbase
+        " Nothing is left between the base and Normal's foreground: the level 3
+        " recedes on the other side instead, which is what it is meant to do.
+        let cw = s:CtermSep(cbase, -up * g:R_note_hl_amount3)
     endif
 
     let gs = strong == '' ? '' : ' guifg=' . strong

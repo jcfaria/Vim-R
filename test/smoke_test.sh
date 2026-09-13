@@ -664,6 +664,22 @@ call RNoteHlReset('Note_1')
 call add(s:l, 'reset ' .
             \\ matchstr(execute('highlight Note_1'), 'guifg=\zs\S\+'))
 call writefile(s:l, '$OUT/note_user_hl.txt')
+
+" A 'Comment' that the terminal paints gray, which is what jellybeans leaves on
+" a terminal of eight colors: ANSI 7 and the blue gui color of Vim's own
+" defaults. The three levels have to stay inside the grayscale ramp, 232-255,
+" and the level 3 has to remain apart from the levels 1 and 2.
+highlight Normal ctermfg=7 ctermbg=NONE guifg=NONE guibg=NONE
+highlight Comment ctermfg=7 guifg=#80a0ff
+call RNoteHlReset()
+let s:d = g:rplugin.note_hl
+call writefile([printf('gray %d %d %d ramp %d apart %d',
+            \\ s:d.ctermfg_base, s:d.ctermfg_1, s:d.ctermfg_3,
+            \\ min([s:d.ctermfg_base, s:d.ctermfg_1, s:d.ctermfg_3]) >= 232
+            \\ && max([s:d.ctermfg_base, s:d.ctermfg_1, s:d.ctermfg_3]) <= 255,
+            \\ s:d.ctermfg_1 != s:d.ctermfg_3)], '$OUT/note_gray.txt')
+colorscheme desert
+call RNoteHlReset()
 EOF
 
 # Note comments: that the maps are bound, where the cursor lands with and
@@ -1027,6 +1043,15 @@ run_note_checks() { # run_note_checks <name>
     else
         fail "$name: RNoteHlReset() did not hand Note_1 back to Vim-R"
         info "recorded: $(tr '\n' '/' < "$OUT/note_user_hl.txt" 2>/dev/null)"
+    fi
+
+    # An achromatic Comment has no hue to keep: a shift along the axes of the
+    # 6x6x6 cube would round them unevenly and invent one.
+    if file_has note_gray.txt 'gray 254 255 250 ramp 1 apart 1'; then
+        pass "$name: an achromatic base stays achromatic, apart on the ramp"
+    else
+        fail "$name: an achromatic base did not stay achromatic"
+        info "recorded: $(tr '\n' '/' < "$OUT/note_gray.txt" 2>/dev/null)"
     fi
 
     act notenav
