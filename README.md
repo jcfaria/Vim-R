@@ -8,6 +8,9 @@ who developed and maintained it for many years. It is now maintained by
 with the goal of keeping Vim-R working with traditional Vim. Contributions from
 anyone willing to help with its maintenance are welcome.
 
+_... a rose only loses its beauty and its fragrance when it is not tended with
+loving care ..._
+
 > [!Note]
 > We also intend to keep Vim-R working with Neovim, but we make no guarantees.
 > Users who work exclusively in Neovim are advised to consider
