@@ -13,6 +13,14 @@ syn match rNote1 contains=@Spell,rCommentTodo,rTodoParen "#\.\%(\.\)\@!.*"
 syn match rNote2 contains=@Spell,rCommentTodo,rTodoParen "#\.\.\%(\.\)\@!.*"
 syn match rNote3 contains=@Spell,rCommentTodo,rTodoParen "#\.\{3,}.*"
 
-hi def link rNote1 SpecialComment
-hi def link rNote2 Statement
-hi def link rNote3 Error
+" Note_1, Note_2 and Note_3 are defined in R/note_hl.vim. They do not exist if
+" R_note_hl is 0, and then the notes must look like any other comment.
+if get(g:, "R_note_hl", 1)
+    hi def link rNote1 Note_1
+    hi def link rNote2 Note_2
+    hi def link rNote3 Note_3
+else
+    hi def link rNote1 Comment
+    hi def link rNote2 Comment
+    hi def link rNote3 Comment
+endif

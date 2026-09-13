@@ -10,7 +10,7 @@
 #   3. sends the test script to R (<LocalLeader>aa),
 #   4. opens the Object Browser (<LocalLeader>ro),
 #   5. asserts on the *contents* of the R Console buffer and of the
-#      Object_Browser buffer,
+#      Object_Browser buffer, and on the highlighting of the note comments,
 #   6. weaves an Rnw file (<LocalLeader>kp), renders an Rmd file and renders a
 #      qmd file, and asserts on the command the plugin sent to R, on the file
 #      that R produced and, for the Rnw file, on the arguments with which
@@ -329,10 +329,28 @@ make_fixtures() { # make_fixtures <dir>
     local d="$1"
     mkdir -p "$d"
 
+    # The note comments are what the highlighting, the folding, the navigation
+    # and the outline are asserted on. They are comments, so neither R nor the
+    # assertions on the R Console and on the Object Browser are affected. The
+    # line numbers matter: see SMOKE_NOTE_LEVELS below.
     cat > "$d/smoke.R" <<'EOF'
 cat("VIMR_SMOKE_SUM:", sum(1:100), "\n")
 smoke_df <- data.frame(alpha = 1:3, beta = c("x", "y", "z"))
 smoke_chr <- "VIMR_SMOKE_CHR"
+#. Section one
+sec1 <- 1
+#.. Subsection 1.1
+sub11 <- 2
+#... Sub-sub 1.1.1
+subsub <- 3
+#.. Subsection 1.2
+sub12 <- 4
+#. Section two
+sec2 <- 5
+# Section three ----
+sec3 <- 6
+#.... Four dots are still a note of level 3
+deep <- 7
 EOF
 
     cat > "$d/smoke_rnw.Rnw" <<'EOF'
@@ -576,6 +594,53 @@ call writefile(map(copy(CompleteQuartoCellOptions('fig-')), 'v:val["abbr"]'),
 unlet g:R_quarto_intel
 EOF
 
+# Note comments: the highlight groups the syntax resolves to, the colors
+# derived from a light and from a dark colorscheme, and what happens to a
+# definition of the user's when the colorscheme changes.
+cat > "$WORK/act_notehl.vim" <<EOF
+call SmokeGoToEditorWin()
+edit! smoke.R
+let s:l = []
+for s:ln in range(1, line('\$'))
+    if getline(s:ln) !~ '^#'
+        continue
+    endif
+    let s:id = synID(s:ln, 1, 1)
+    let s:tr = synIDtrans(s:id)
+    let s:at = []
+    if synIDattr(s:tr, 'bold') == 1
+        call add(s:at, 'bold')
+    endif
+    if synIDattr(s:tr, 'underline') == 1
+        call add(s:at, 'underline')
+    endif
+    call add(s:l, printf('%s -> %s [%s] | %s', synIDattr(s:id, 'name'),
+                \\ synIDattr(s:tr, 'name'), join(s:at, ','), getline(s:ln)))
+endfor
+call writefile(s:l, '$OUT/note_syn.txt')
+
+let s:l = []
+for s:cs in ['morning', 'desert']
+    exe 'colorscheme ' . s:cs
+    let s:d = g:rplugin.note_hl
+    call add(s:l, printf('%s %s %s %d %d', s:cs, s:d.fg_1, s:d.fg_3,
+                \\ s:d.ctermfg_1, s:d.ctermfg_3))
+endfor
+call writefile(s:l, '$OUT/note_colors.txt')
+
+highlight Note_1 guifg=#b73e30 gui=bold,underline
+let s:l = []
+for s:cs in ['morning', 'habamax', 'desert']
+    exe 'colorscheme ' . s:cs
+    call add(s:l, s:cs . ' ' .
+                \\ matchstr(execute('highlight Note_1'), 'guifg=\zs\S\+'))
+endfor
+call RNoteHlReset('Note_1')
+call add(s:l, 'reset ' .
+            \\ matchstr(execute('highlight Note_1'), 'guifg=\zs\S\+'))
+call writefile(s:l, '$OUT/note_user_hl.txt')
+EOF
+
 cat > "$WORK/act_quit.vim" <<EOF
 if exists('*RQuit')
     call RQuit('nosave')
@@ -667,7 +732,9 @@ run_document_checks() { # run_document_checks <name> <proj-dir>
         else
             fail "$name: smoke_rnw.pdf was not produced"
         fi
-        if [ -f "$proj/smoke_rnw.synctex.gz" ]; then
+        # pdflatex writes the .synctex.gz after the .pdf, so this has to be
+        # waited for too: checking it right after the pdf appeared is a race.
+        if wait_until 60 "[ -f '$proj/smoke_rnw.synctex.gz' ]"; then
             pass "$name: latexmk produced smoke_rnw.synctex.gz"
         else
             fail "$name: smoke_rnw.synctex.gz was not produced"
@@ -812,6 +879,61 @@ run_document_checks() { # run_document_checks <name> <proj-dir>
     fi
 }
 
+# ----------------------------------------------- note comment assertions -----
+
+# Asserts what does not depend on R: the highlighting of the note comments.
+# The expected colors are what the documented formula produces out of the
+# color of Comment and the foreground of Normal of each colorscheme, and they
+# are the same in Vim and in Neovim and with and without 'termguicolors'.
+run_note_checks() { # run_note_checks <name>
+    local name="$1"
+
+    act notehl
+    sleep 1
+
+    local want
+    for want in 'rNote1 -> Note_1 [bold,underline] | #. Section one' \
+                'rNote2 -> Note_2 [bold] | #.. Subsection 1.1' \
+                'rNote3 -> Note_3 [] | #... Sub-sub 1.1.1' \
+                'rNote3 -> Note_3 [] | #.... Four dots' \
+                'rComment -> Comment [] | # Section three'; do
+        if file_has note_syn.txt "$want"; then
+            pass "$name: $want"
+        else
+            fail "$name: the syntax of the notes is not '$want'"
+            info "recorded: $(tr '\n' '/' < "$OUT/note_syn.txt" 2>/dev/null)"
+        fi
+    done
+
+    for want in 'morning #00008c #0000d1 19 20' \
+                'desert #afe4f4 #87d7ef 195 117'; do
+        if file_has note_colors.txt "$want"; then
+            pass "$name: colors derived from the colorscheme: $want"
+        else
+            fail "$name: the colors derived from the colorscheme are not '$want'"
+            info "recorded: $(tr '\n' '/' < "$OUT/note_colors.txt" 2>/dev/null)"
+        fi
+    done
+
+    # ':colorscheme' runs ':highlight clear' before triggering ColorScheme, so
+    # this fails unless the plugin noted the user's definition beforehand.
+    if file_has note_user_hl.txt 'morning #b73e30' &&
+            file_has note_user_hl.txt 'habamax #b73e30' &&
+            file_has note_user_hl.txt 'desert #b73e30'; then
+        pass "$name: a ':hi Note_1' of the user's survives a colorscheme change"
+    else
+        fail "$name: a ':hi Note_1' of the user's did not survive a colorscheme change"
+        info "recorded: $(tr '\n' '/' < "$OUT/note_user_hl.txt" 2>/dev/null)"
+    fi
+
+    if file_has note_user_hl.txt 'reset #afe4f4'; then
+        pass "$name: RNoteHlReset() hands Note_1 back to Vim-R"
+    else
+        fail "$name: RNoteHlReset() did not hand Note_1 back to Vim-R"
+        info "recorded: $(tr '\n' '/' < "$OUT/note_user_hl.txt" 2>/dev/null)"
+    fi
+}
+
 # --------------------------------------------------------------- editor run --
 
 run_editor() { # run_editor <name> <editor-command...>
@@ -837,6 +959,9 @@ run_editor() { # run_editor <name> <editor-command...>
         tmux -L "$SOCK" kill-session -t "$SESSION" 2>/dev/null
         return
     fi
+
+    # Nothing below depends on R, so it is asserted before R is started.
+    run_note_checks "$name"
 
     # Once a step fails there is no point in waiting out the timeout of every
     # step that depends on it: report them as failures right away.
@@ -947,7 +1072,8 @@ fi
 
 STRAY="$(find "$REPO" -path "$REPO/.git" -prune -o \
     \( -name '*.swp' -o -name '*.swo' -o -name 'nvim.log' -o -name '.netrwhist' \
-       -o -name '*.tmp.R' -o -name '*.aux' -o -name '*.synctex.gz' \) \
+       -o -name '*.tmp.R' -o -name '*.aux' -o -name '*.synctex.gz' \
+       -o -name 'objlist' \) \
     -print 2>/dev/null)"
 if [ -z "$STRAY" ]; then
     pass "no editor leftovers in the repository working tree"

@@ -903,6 +903,10 @@ let g:R_disable_cmds      = get(g:, "R_disable_cmds",    [''])
 let g:R_enable_comment    = get(g:, "R_enable_comment",     0)
 let g:R_openhtml          = get(g:, "R_openhtml",           1)
 let g:R_hi_fun_paren      = get(g:, "R_hi_fun_paren",       0)
+let g:R_note_hl           = get(g:, "R_note_hl",            1)
+let g:R_note_hl_base      = get(g:, "R_note_hl_base", "Comment")
+let g:R_note_hl_amount    = get(g:, "R_note_hl_amount",  0.45)
+let g:R_note_hl_amount3   = get(g:, "R_note_hl_amount3", 0.18)
 let g:R_bib_compl         = get(g:, "R_bib_compl", ["rnoweb"])
 
 if type(g:R_bib_compl) == v:t_string
@@ -1091,6 +1095,10 @@ endif
 
 if g:R_enable_comment
     exe "source " . substitute(g:rplugin.home, " ", "\\ ", "g") . "/R/comment.vim"
+endif
+
+if g:R_note_hl
+    exe "source " . substitute(g:rplugin.home, " ", "\\ ", "g") . "/R/note_hl.vim"
 endif
 
 if has("gui_running")

@@ -921,6 +921,9 @@ the superfluous command `syntax enable`. For details, see:
 |R_hi_fun|              Highlight R functions
 |R_hi_fun_paren|        Highlight R functions only if followed by a `(`
 |R-note-comments|       Highlight the note comments `#.`, `#..` and `#...`
+|R_note_hl|             Compute the colors of the note comments
+|R_note_hl_base|        Highlight group the colors of the notes come from
+|R_note_hl_amount|, |R_note_hl_amount3|  How much a note differs from a comment
 |R_routnotab|           Show output of R CMD BATCH in new window
 |R_notmuxconf|          Don't use a specially built Tmux config file
 |R_rconsole_height|     Number of lines of R Console
@@ -1530,6 +1533,10 @@ Vim-R, put in your |vimrc|:
    let R_hi_fun = 0
 <
                                                              *R-note-comments*
+                                                                   *R_note_hl*
+                                                              *R_note_hl_base*
+                                                            *R_note_hl_amount*
+                                                           *R_note_hl_amount3*
 Besides the usual highlighting of comments, Vim-R highlights three levels of
 "note" comments in R code:
 
@@ -1540,17 +1547,51 @@ Besides the usual highlighting of comments, Vim-R highlights three levels of
   - `#...` is a note of level 3, highlighted as `rNote3`.
 
 The whole comment is highlighted, the marker included, and four or more dots
-are still a note of level 3. The three groups are linked by default to
-`SpecialComment`, `Statement` and `Error`, so that they follow your
-colorscheme, but you can define your own highlighting in your |vimrc|, as in
-the example below:
+are still a note of level 3. The notes are also highlighted in the R code
+chunks of Rnoweb, R Markdown and Quarto documents.
+
+The three groups are linked to `Note_1`, `Note_2` and `Note_3`, whose colors
+are not fixed: they are computed from the colorscheme, and recomputed
+whenever it changes, so that the notes are emphasized discreetly and in
+harmony with the theme. The levels differ both in their attributes and in
+their color:
+
+  - `Note_1` is bold and underlined;
+
+  - `Note_2` is bold;
+
+  - `Note_3` has no attribute and is the level whose color is the closest to
+    an ordinary comment.
+
+The hue is taken from the `Comment` group, and the color is moved from it
+towards the foreground of `Normal`, which is the most legible color of the
+colorscheme: the levels 1 and 2 are moved 45% of the way and the level 3 only
+18%. Hence, in a light colorscheme the level 3 really is lighter than the
+levels 1 and 2, while in a dark one it is darker; in both, it is the level
+that recedes. On a terminal with 256 colors, the palette index is moved along
+the axes of the xterm color cube, which preserves the hue too.
+
+To derive the colors from another highlight group, or to change how far they
+are moved, put in your |vimrc|:
 >vim
-   hi rNote1 ctermfg=245 guifg=#8a8a8a
-   hi rNote2 ctermfg=214 guifg=#ffaf00 cterm=bold gui=bold
-   hi rNote3 ctermfg=231 ctermbg=160 guifg=#ffffff guibg=#d70000
+   let R_note_hl_base = 'Statement'
+   let R_note_hl_amount = 0.60
+   let R_note_hl_amount3 = 0.25
 <
-The notes are also highlighted in the R code chunks of Rnoweb, R Markdown and
-Quarto documents.
+If you prefer to choose the colors yourself, define the groups in your
+|vimrc|. Your definition is never overridden and, unlike the highlighting of
+most plugins, it also survives a change of colorscheme:
+>vim
+   hi Note_1 guifg=#b73e30 cterm=bold,underline gui=bold,underline
+   hi Note_2 guifg=#b73e30 cterm=bold gui=bold
+   hi Note_3 guifg=#c96054
+<
+Do `:call RNoteHlReset()` to hand the groups back to Vim-R. If you prefer that
+Vim-R does not compute the colors at all, and that the notes look like any
+other comment, put in your |vimrc|:
+>vim
+   let R_note_hl = 0
+<
 
 ------------------------------------------------------------------------------
 6.11. How to automatically open the .Rout file                   *R_routnotab*
@@ -2651,9 +2692,17 @@ See also: |R_source|.
    offering no completion at all.
  * Highlight three levels of note comments in R code: `#.` is a note of level
    1, `#..` of level 2, and `#...` (or more dots) of level 3. The whole
-   comment is highlighted, and the new highlight groups rNote1, rNote2 and
-   rNote3 are linked to standard groups, so that they follow the colorscheme
-   and can be redefined in the |vimrc|. See |R-note-comments|.
+   comment is highlighted, the marker included, and the notes are also
+   highlighted in the R code chunks of Rnoweb, R Markdown and Quarto
+   documents. The level 1 is bold and underlined, the level 2 is bold, and
+   the level 3 has no attribute. Their colors are not fixed: the new
+   highlight groups Note_1, Note_2 and Note_3 are computed from the color of
+   `Comment` and from the foreground of `Normal`, and recomputed whenever the
+   colorscheme changes, so that the notes are emphasized discreetly and in
+   harmony with the theme. A definition of your own in the |vimrc| is never
+   overridden and also survives a change of colorscheme. New options:
+   R_note_hl, R_note_hl_base, R_note_hl_amount and R_note_hl_amount3. See
+   |R-note-comments|.
  * Fix bibliographic completion with R_python3: the check tested the literal
    string "g:R_python3" instead of the value of the option, so any
    interpreter set in R_python3 was rejected as "not found" and completion
