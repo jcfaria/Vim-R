@@ -2832,6 +2832,13 @@ See also: |R_source|.
    executable file, a path starting with "~" is expanded, and a warning is
    issued when the interpreter cannot be used. The option is documented
    now. See |R_python3|.
+ * Fix the warning about a missing ".synctex.gz": R_latexcmd has been a list
+   since 0.9.11, but the branch reached when the SyncTeX file is not found
+   still compared it with a string, so it raised "E691: Can only compare
+   List with List" instead of noting that "-synctex=1" is missing from the
+   option. The string is now looked for in the whole list. The deprecation
+   warning about R_latexcmd not being a list tests the type of the option
+   now, instead of the length of its first element. See |R_latexcmd|.
 
 0.9.21 (2025-04-15)
 

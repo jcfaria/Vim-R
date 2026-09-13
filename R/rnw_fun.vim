@@ -470,7 +470,7 @@ function SyncTeX_forward(...)
     endif
     if !filereadable(b:rplugin_pdfdir . "/" . basenm . ".synctex.gz")
         call RWarningMsg('SyncTeX forward cannot be done because the file "' . b:rplugin_pdfdir . "/" . basenm . '.synctex.gz" is missing.')
-        if g:R_latexcmd != "default" && g:R_latexcmd !~ "synctex"
+        if g:R_latexcmd[0] != "default" && join(g:R_latexcmd) !~ "synctex"
             call RWarningMsg('Note: The string "-synctex=1" is not in your R_latexcmd. Please check your vimrc.')
         endif
         return

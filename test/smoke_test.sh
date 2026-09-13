@@ -566,6 +566,21 @@ call cursor($SYNCTEX_RNW_LINE, 1)
 call SyncTeX_forward()
 EOF
 
+# The branch of SyncTeX_forward() that runs when the .synctex.gz is missing.
+# R_latexcmd is deliberately left without "-synctex=1" so that the note about
+# it is reached, which is where the comparison of the list with a string used
+# to raise E691.
+cat > "$WORK/act_synctex_missing.vim" <<EOF
+call SmokeGoToEditorWin()
+let s:cmd = g:R_latexcmd
+let g:R_latexcmd = ['xelatex', '-file-line-error']
+call cursor($SYNCTEX_RNW_LINE, 1)
+call SyncTeX_forward()
+let g:R_latexcmd = s:cmd
+call writefile(split(execute('messages'), nr2char(10)),
+            \\ '$OUT/synctex_missing.txt')
+EOF
+
 cat > "$WORK/act_rmd.vim" <<EOF
 call SmokeGoToEditorWin()
 edit smoke_rmd.Rmd
@@ -840,6 +855,20 @@ run_document_checks() { # run_document_checks <name> <proj-dir>
                 fi
             else
                 fail "$name: SyncTeX_forward() did not invoke the forward search"
+            fi
+
+            rm -f "$OUT/synctex_missing.txt"
+            mv "$proj/smoke_rnw.synctex.gz" "$proj/kept.synctex.gz"
+            act synctex_missing
+            wait_until 30 "[ -f '$OUT/synctex_missing.txt' ]" || true
+            mv "$proj/kept.synctex.gz" "$proj/smoke_rnw.synctex.gz"
+            if file_has synctex_missing.txt \
+                    'The string "-synctex=1" is not in your R_latexcmd' &&
+                    ! file_has synctex_missing.txt 'E691'; then
+                pass "$name: SyncTeX forward notes a R_latexcmd without -synctex=1"
+            else
+                fail "$name: SyncTeX forward did not note a R_latexcmd without -synctex=1"
+                info "recorded: $(grep -E 'synctex|E691' "$OUT/synctex_missing.txt" 2>/dev/null | tail -3 | tr '\n' '/')"
             fi
         else
             skip "$name: SyncTeX forward search (no pdf to search in)"

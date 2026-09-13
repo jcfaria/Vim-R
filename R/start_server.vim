@@ -467,7 +467,7 @@ if exists("g:R_ca_ck")
 endif
 
 " 2017-11-15
-if len(g:R_latexcmd[0]) == 1
+if type(g:R_latexcmd) != v:t_list
     call RWarningMsg("The option R_latexcmd should be a list. Please update your vimrc.")
 endif
 
