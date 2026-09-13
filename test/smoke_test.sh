@@ -31,6 +31,14 @@
 # editor. Step 6 asserts the *invocation* of the forward search, not its
 # effect.
 #
+# How it waits (see do_act and r_is_idle below): the editor is driven by Tmux,
+# which says nothing about when the editor is done, so nothing here is asserted
+# after a delay. A file written by the editor is asserted after the act_*.vim
+# that writes it has written its sentinel, and a file written by R, or by a
+# program R called, is asserted after R has printed a marker sent to it *after*
+# the command that produces the file. Every wait has a timeout, and a timeout is
+# reported as a failure of its own.
+#
 # How to run it:
 #
 #   ./test/smoke_test.sh            # from anywhere; no arguments
@@ -530,6 +538,13 @@ function! SyncTeX_forward2(tpath, ppath, texln, tryagain)
 endfunction
 EOF
 
+# The marker R prints when it has finished everything sent to it so far. The
+# arguments are separate so that the line R echoes when it reads the command
+# cannot be mistaken for the line R prints when it runs it.
+cat > "$WORK/act_ridle.vim" <<EOF
+call g:SendCmdToR('cat("VIMR_SMOKE_IDLE:", "' . g:smoke_idle_tag . '", "\n")')
+EOF
+
 cat > "$WORK/act_startr.vim" <<EOF
 call StartR("R")
 EOF
@@ -745,38 +760,64 @@ if exists('*RQuit')
 endif
 EOF
 
+# The sentinel that sentinel() blocks on. It has to be the last line of every
+# one of these scripts, and appending it here is what keeps it so: a Vimscript
+# error does not abort the rest of a sourced file, so the sentinel is written
+# whatever happened above it, and an assertion that fails is reported as an
+# assertion that failed instead of as a timeout.
+for f in "$WORK"/act_*.vim; do
+    printf "call writefile(['%s'], '%s')\n" \
+        "$(basename "$f" .vim | sed 's/^act_//')" "$OUT/act_done" >> "$f"
+done
+
 # ------------------------------------------------------------- tmux driving --
 
 SESSION=""
 
 ex() { # ex <ex-command>: leave Terminal mode, then run an ex command
     tmux -L "$SOCK" send-keys -t "$SESSION" 'C-\' 'C-n' 2>/dev/null
+    # A pending prompt of the editor's would swallow the ':' and everything
+    # typed after it. Sent after Terminal mode has been left, so that it cannot
+    # reach R instead of the editor.
+    tmux -L "$SOCK" send-keys -t "$SESSION" Escape 2>/dev/null
     tmux -L "$SOCK" send-keys -t "$SESSION" ":$1" Enter 2>/dev/null
 }
 
-act() { ex "source $WORK/act_$1.vim"; }
+act() { rm -f "$OUT/act_done"; ex "source $WORK/act_$1.vim"; }
 
 refresh_dump() {
     ex "source $WORK/dump.vim"
     sleep 0.5
 }
 
+hard_errors() {
+    if [ -f "$OUT/messages.txt" ]; then
+        grep -cE 'E1(17|21|29):' "$OUT/messages.txt" || true
+    else
+        printf '0\n'
+    fi
+}
+
 # wait_until <timeout-seconds> <predicate> [action-to-repeat-every-~10s]
 #
-# Gives up early if the editor reported a hard Vimscript error (E117 is what
-# Neovim raises when it is made to source the Vim job layer: job_start() does
-# not exist there), so a broken build fails in seconds instead of minutes.
+# Gives up early if the editor reported a *new* hard Vimscript error (E117 is
+# what Neovim raises when it is made to source the Vim job layer: job_start()
+# does not exist there), so a broken build fails in seconds instead of minutes.
+# Only new errors count: ':messages' is a history, and an error left in it by
+# an earlier step would otherwise make every later wait return at once and
+# report whatever it was waiting for as missing.
 wait_until() {
     local timeout="$1" predicate="$2" retry="${3:-}"
     local deadline=$((SECONDS + timeout))
     local n=0
+    local errors_before
+    errors_before="$(hard_errors)"
     while [ "$SECONDS" -lt "$deadline" ]; do
         refresh_dump
         if eval "$predicate" >/dev/null 2>&1; then
             return 0
         fi
-        if [ -f "$OUT/messages.txt" ] &&
-                grep -qE 'E1(17|21|29):' "$OUT/messages.txt"; then
+        if [ "$(hard_errors)" != "$errors_before" ]; then
             return 1
         fi
         n=$((n + 1))
@@ -791,6 +832,68 @@ wait_until() {
 file_is()  { [ "$(cat "$OUT/$1" 2>/dev/null)" = "$2" ]; }
 file_has() { [ -f "$OUT/$1" ] && grep -qF -- "$2" "$OUT/$1"; }
 
+# sentinel <act-name> <timeout-seconds>
+#
+# Every act_*.vim writes its own name into $OUT/act_done as its last line, so
+# the sentinel naming the script that was sourced means that every writefile()
+# of that script has already returned: an assertion that runs afterwards cannot
+# read a file the editor has not written yet, nor half of one. A fixed delay
+# cannot promise that, however long it is. The sentinel is written by the
+# editor itself, so waiting for it needs no round trip through dump.vim.
+sentinel() {
+    local act="$1" deadline=$((SECONDS + $2))
+    while [ "$SECONDS" -lt "$deadline" ]; do
+        if file_is act_done "$act"; then
+            return 0
+        fi
+        sleep 0.2
+    done
+    return 1
+}
+
+# do_act <editor> <act-name>
+#
+# Sources act_<name>.vim and blocks until it has run. Keys typed into a Tmux
+# pane are not acknowledged by the editor, and one of these scripts is now and
+# then never sourced at all: without the sentinel that is reported as whatever
+# the script was supposed to produce -- an empty file, a command the plugin
+# never sent -- and the plugin is blamed for it. Sourcing a script twice is
+# harmless, every one of them is written to be repeatable, and the sentinel
+# appears within milliseconds of the keys arriving, so a resend can only ever
+# hit a script that really did not run.
+do_act() {
+    local name="$1" act="$2" try=0
+    while [ "$try" -lt 3 ]; do
+        act "$act"
+        try=$((try + 1))
+        if sentinel "$act" 20; then
+            return 0
+        fi
+    done
+    fail "$name: the editor did not source act_$act.vim ($try attempts)"
+    tmux -L "$SOCK" capture-pane -p -t "$SESSION" > "$OUT/pane.txt" 2>/dev/null
+    [ -f "$OUT/pane.txt" ] && sed -n '1,25p' "$OUT/pane.txt" | sed 's/^/      | /'
+    return 1
+}
+
+# r_is_idle <editor> <tag> <timeout-seconds>
+#
+# R runs what it is sent in the order it is sent, so a marker sent after a
+# document command only reaches the R Console once that command has returned,
+# and with it knitr, latexmk, pandoc or quarto. Nothing else says that: an
+# output file appears while the tool that writes it is still running, and
+# latexmk writes the pdf in its first pass and then starts a second one.
+r_is_idle() {
+    local name="$1" tag="$2" timeout="$3"
+    ex "let g:smoke_idle_tag = '$tag'"
+    do_act "$name" ridle || return 1
+    if wait_until "$timeout" "file_has rconsole.txt 'VIMR_SMOKE_IDLE: $tag'"; then
+        return 0
+    fi
+    fail "$name: R was still busy ${timeout}s after the $tag command"
+    return 1
+}
+
 # ------------------------------------------------- document format assertions --
 
 # Asserts the layer that depends on the editor: the command the plugin builds
@@ -798,20 +901,18 @@ file_has() { [ -f "$OUT/$1" ] && grep -qF -- "$2" "$OUT/$1"; }
 run_document_checks() { # run_document_checks <name> <proj-dir>
     local name="$1" proj="$2"
 
-    act hooks
-    sleep 1
+    do_act "$name" hooks || return
 
     # -------------------------------------------------------------- Rnoweb --
     if [ "$HAVE_RNW" -eq 1 ]; then
-        act openrnw
-        sleep 2
+        do_act "$name" openrnw || return
         if file_is ft_rnw rnoweb; then
             pass "$name: smoke_rnw.Rnw has filetype 'rnoweb'"
         else
             fail "$name: filetype of smoke_rnw.Rnw is '$(cat "$OUT/ft_rnw" 2>/dev/null)', expected 'rnoweb'"
         fi
 
-        act rnw
+        do_act "$name" rnw || return
         local want_rnw="vim.interlace.rnoweb(\"smoke_rnw.Rnw\", rnwdir = \"$proj\", view = FALSE)"
         if wait_until 30 "file_has sentcmds.txt '$want_rnw'"; then
             pass "$name: sent to R: $want_rnw"
@@ -820,71 +921,86 @@ run_document_checks() { # run_document_checks <name> <proj-dir>
             info "recorded: $(grep -F 'interlace.rnoweb' "$OUT/sentcmds.txt" 2>/dev/null | tail -1)"
         fi
 
-        if wait_until 300 "[ -f '$proj/smoke_rnw.tex' ]"; then
-            pass "$name: knitr produced smoke_rnw.tex"
-        else
-            fail "$name: smoke_rnw.tex was not produced"
-        fi
-        if wait_until 300 "[ -f '$proj/smoke_rnw.pdf' ]"; then
-            pass "$name: latexmk produced smoke_rnw.pdf"
-        else
-            fail "$name: smoke_rnw.pdf was not produced"
-        fi
-        # pdflatex writes the .synctex.gz after the .pdf, so this has to be
-        # waited for too: checking it right after the pdf appeared is a race.
-        if wait_until 60 "[ -f '$proj/smoke_rnw.synctex.gz' ]"; then
-            pass "$name: latexmk produced smoke_rnw.synctex.gz"
-        else
-            fail "$name: smoke_rnw.synctex.gz was not produced"
+        # Every file below is written by latexmk, which runs *latex twice: the
+        # first pass writes the pdf and the .synctex.gz, the second one writes
+        # them again. Asserting as soon as a file exists therefore asserts in
+        # the middle of the build, and what comes next -- moving the
+        # .synctex.gz aside -- would race with a pass that puts it back.
+        if r_is_idle "$name" rnw 300; then
+            if [ -f "$proj/smoke_rnw.tex" ]; then
+                pass "$name: knitr produced smoke_rnw.tex"
+            else
+                fail "$name: smoke_rnw.tex was not produced"
+            fi
+            if [ -f "$proj/smoke_rnw.pdf" ]; then
+                pass "$name: latexmk produced smoke_rnw.pdf"
+            else
+                fail "$name: smoke_rnw.pdf was not produced"
+            fi
+            if [ -f "$proj/smoke_rnw.synctex.gz" ]; then
+                pass "$name: latexmk produced smoke_rnw.synctex.gz"
+            else
+                fail "$name: smoke_rnw.synctex.gz was not produced"
+                info "latexmk: $(grep -F "Exit status of 'latexmk'" "$OUT/rconsole.txt" 2>/dev/null | tail -1)"
+            fi
         fi
 
         # SyncTeX forward search: assert the invocation, not the viewer.
         if [ -f "$proj/smoke_rnw.pdf" ] && [ -f "$proj/smoke_rnw.tex" ]; then
             rm -f "$OUT/synctex.txt"
-            act synctex
-            if wait_until 30 "[ -f '$OUT/synctex.txt' ]"; then
-                local stex spdf sln
-                stex="$(sed -n 1p "$OUT/synctex.txt")"
-                spdf="$(sed -n 2p "$OUT/synctex.txt")"
-                sln="$(sed -n 3p "$OUT/synctex.txt")"
+            if do_act "$name" synctex; then
+                if [ -f "$OUT/synctex.txt" ]; then
+                    local stex spdf sln
+                    stex="$(sed -n 1p "$OUT/synctex.txt")"
+                    spdf="$(sed -n 2p "$OUT/synctex.txt")"
+                    sln="$(sed -n 3p "$OUT/synctex.txt")"
 
-                if [ "$stex" = "$proj/smoke_rnw.tex" ]; then
-                    pass "$name: SyncTeX forward resolved the master to $stex"
+                    if [ "$stex" = "$proj/smoke_rnw.tex" ]; then
+                        pass "$name: SyncTeX forward resolved the master to $stex"
+                    else
+                        fail "$name: SyncTeX forward passed tex file '$stex', expected '$proj/smoke_rnw.tex'"
+                    fi
+                    # SetPDFdir() resolves "." to the master's own directory.
+                    if [ "$spdf" = "$proj/smoke_rnw.pdf" ]; then
+                        pass "$name: SyncTeX forward passed the pdf as $spdf"
+                    else
+                        fail "$name: SyncTeX forward passed pdf '$spdf', expected '$proj/smoke_rnw.pdf'"
+                    fi
+                    # Ground truth: the marker is on the Rnw line the cursor is
+                    # on and, verbatim, on the tex line the concordance
+                    # resolves to.
+                    if [ -n "$sln" ] && sed -n "${sln}p" "$proj/smoke_rnw.tex" |
+                            grep -qF 'VIMRSMOKESYNCTEXTARGET'; then
+                        pass "$name: SyncTeX forward resolved Rnw line $SYNCTEX_RNW_LINE to tex line $sln, which holds the marker"
+                    else
+                        fail "$name: SyncTeX forward resolved to tex line '$sln', which does not hold the marker"
+                        info "tex line $sln: $(sed -n "${sln}p" "$proj/smoke_rnw.tex" 2>/dev/null)"
+                        info "marker is on tex line(s): $(grep -n 'VIMRSMOKESYNCTEXTARGET' "$proj/smoke_rnw.tex" | cut -d: -f1 | tr '\n' ' ')"
+                    fi
                 else
-                    fail "$name: SyncTeX forward passed tex file '$stex', expected '$proj/smoke_rnw.tex'"
+                    fail "$name: SyncTeX_forward() did not invoke the forward search"
+                    refresh_dump
+                    info "warning: $(grep -F 'SyncTeX' "$OUT/messages.txt" 2>/dev/null | tail -1)"
                 fi
-                # SetPDFdir() resolves "." to the master's own directory.
-                if [ "$spdf" = "$proj/smoke_rnw.pdf" ]; then
-                    pass "$name: SyncTeX forward passed the pdf as $spdf"
-                else
-                    fail "$name: SyncTeX forward passed pdf '$spdf', expected '$proj/smoke_rnw.pdf'"
-                fi
-                # Ground truth: the marker is on the Rnw line the cursor is on
-                # and, verbatim, on the tex line the concordance resolves to.
-                if [ -n "$sln" ] && sed -n "${sln}p" "$proj/smoke_rnw.tex" |
-                        grep -qF 'VIMRSMOKESYNCTEXTARGET'; then
-                    pass "$name: SyncTeX forward resolved Rnw line $SYNCTEX_RNW_LINE to tex line $sln, which holds the marker"
-                else
-                    fail "$name: SyncTeX forward resolved to tex line '$sln', which does not hold the marker"
-                    info "tex line $sln: $(sed -n "${sln}p" "$proj/smoke_rnw.tex" 2>/dev/null)"
-                    info "marker is on tex line(s): $(grep -n 'VIMRSMOKESYNCTEXTARGET' "$proj/smoke_rnw.tex" | cut -d: -f1 | tr '\n' ' ')"
-                fi
-            else
-                fail "$name: SyncTeX_forward() did not invoke the forward search"
             fi
 
+            # The file is moved aside, and not deleted, because latexmk would
+            # not write it again: it does not treat the .synctex.gz as a target
+            # of its own, so with an up to date pdf it has nothing to do.
+            local finished=0
             rm -f "$OUT/synctex_missing.txt"
             mv "$proj/smoke_rnw.synctex.gz" "$proj/kept.synctex.gz"
-            act synctex_missing
-            wait_until 30 "[ -f '$OUT/synctex_missing.txt' ]" || true
+            do_act "$name" synctex_missing || finished=1
             mv "$proj/kept.synctex.gz" "$proj/smoke_rnw.synctex.gz"
-            if file_has synctex_missing.txt \
-                    'The string "-synctex=1" is not in your R_latexcmd' &&
-                    ! file_has synctex_missing.txt 'E691'; then
-                pass "$name: SyncTeX forward notes a R_latexcmd without -synctex=1"
-            else
-                fail "$name: SyncTeX forward did not note a R_latexcmd without -synctex=1"
-                info "recorded: $(grep -E 'synctex|E691' "$OUT/synctex_missing.txt" 2>/dev/null | tail -3 | tr '\n' '/')"
+            if [ "$finished" -eq 0 ]; then
+                if file_has synctex_missing.txt \
+                        'The string "-synctex=1" is not in your R_latexcmd' &&
+                        ! file_has synctex_missing.txt 'E691'; then
+                    pass "$name: SyncTeX forward notes a R_latexcmd without -synctex=1"
+                else
+                    fail "$name: SyncTeX forward did not note a R_latexcmd without -synctex=1"
+                    info "recorded: $(grep -E 'synctex|E691' "$OUT/synctex_missing.txt" 2>/dev/null | tail -3 | tr '\n' '/')"
+                fi
             fi
         else
             skip "$name: SyncTeX forward search (no pdf to search in)"
@@ -895,8 +1011,7 @@ run_document_checks() { # run_document_checks <name> <proj-dir>
 
     # ---------------------------------------------------------- R Markdown --
     if [ "$HAVE_RMD" -eq 1 ]; then
-        act rmd
-        sleep 2
+        do_act "$name" rmd || return
         if file_is ft_rmd rmd; then
             pass "$name: smoke_rmd.Rmd has filetype 'rmd'"
         else
@@ -911,11 +1026,15 @@ run_document_checks() { # run_document_checks <name> <proj-dir>
             info "recorded: $(grep -F 'interlace.rmd' "$OUT/sentcmds.txt" 2>/dev/null | tail -1)"
         fi
 
-        if wait_until 300 "[ -f '$proj/smoke_rmd.html' ]"; then
-            pass "$name: rmarkdown produced smoke_rmd.html"
-        else
-            fail "$name: smoke_rmd.html was not produced"
+        if r_is_idle "$name" rmd 300; then
+            if [ -f "$proj/smoke_rmd.html" ]; then
+                pass "$name: rmarkdown produced smoke_rmd.html"
+            else
+                fail "$name: smoke_rmd.html was not produced"
+            fi
         fi
+        # vimcom sends the request through the server, so the editor writes the
+        # recorded path a moment after R has returned.
         if wait_until 60 "file_has opendoc.txt 'smoke_rmd.html'"; then
             pass "$name: vimcom told the editor to open smoke_rmd.html"
         else
@@ -927,8 +1046,7 @@ run_document_checks() { # run_document_checks <name> <proj-dir>
 
     # -------------------------------------------------------------- Quarto --
     if [ "$HAVE_QMD" -eq 1 ]; then
-        act qmd
-        sleep 2
+        do_act "$name" qmd || return
         if file_is ft_qmd quarto; then
             pass "$name: smoke_qmd.qmd has filetype 'quarto'"
         else
@@ -943,16 +1061,20 @@ run_document_checks() { # run_document_checks <name> <proj-dir>
             info "recorded: $(grep -F 'quarto_render' "$OUT/sentcmds.txt" 2>/dev/null | tail -1)"
         fi
 
-        if wait_until 420 "[ -f '$proj/smoke_qmd.html' ]"; then
-            pass "$name: quarto produced smoke_qmd.html"
-        else
-            fail "$name: smoke_qmd.html was not produced"
+        # quarto writes the html and then removes what it used to build it, so
+        # the assertions that follow have to wait for it to be done with the
+        # directory and not for the html to appear in it.
+        if r_is_idle "$name" qmd 420; then
+            if [ -f "$proj/smoke_qmd.html" ]; then
+                pass "$name: quarto produced smoke_qmd.html"
+            else
+                fail "$name: smoke_qmd.html was not produced"
+            fi
         fi
     else
         skip "$name: qmd render ($WHY_QMD)"
         # The completion assertion still needs a quarto buffer.
-        act qmd
-        sleep 2
+        do_act "$name" qmd || return
     fi
 
     # Chunk-option completion, which reads quarto's yaml intelligence file.
@@ -1000,8 +1122,7 @@ run_document_checks() { # run_document_checks <name> <proj-dir>
 run_note_checks() { # run_note_checks <name>
     local name="$1"
 
-    act notehl
-    sleep 1
+    do_act "$name" notehl || return
 
     local want
     for want in 'rNote1 -> Note_1 [bold,underline] | #. Section one' \
@@ -1054,8 +1175,7 @@ run_note_checks() { # run_note_checks <name>
         info "recorded: $(tr '\n' '/' < "$OUT/note_gray.txt" 2>/dev/null)"
     fi
 
-    act notenav
-    sleep 1
+    do_act "$name" notenav || return
 
     # The level of every line of the fixture, and where the cursor lands. A
     # count is the deepest level to stop at, so 'next1' walks the level 1
@@ -1092,8 +1212,7 @@ run_note_checks() { # run_note_checks <name>
         fi
     done
 
-    act notefold
-    sleep 1
+    do_act "$name" notefold || return
 
     for want in 'default manual' \
                 'set expr RNoteFoldExpr(v:lnum) RNoteFoldText()' \
