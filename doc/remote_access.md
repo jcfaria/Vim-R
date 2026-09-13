@@ -1,23 +1,23 @@
 ## Both Vim and R on the remote machine
 
-The easiest way to run R in a remote machine is to log into the remote device
-through ssh, start Vim, and run R in a Vim's terminal (the default). You
-will only need Vim and R configured as usual in the remote machine.
+The easiest way to run R on a remote machine is to log into the remote device
+through ssh, start Vim, and run R in a Vim terminal (the default). You
+will only need Vim and R configured as usual on the remote machine.
 
 ## Only R on the remote machine
 
-However, if you need to start Vim on the local machine and run R in the remote
-machine, then, a lot of additional configuration is required to enable full
+However, if you need to start Vim on the local machine and run R on the remote
+machine, a lot of additional configuration is required to enable full
 communication between Vim and R because by default both Vim-R and vimcom only
-accept TCP connections from the local host, and, R saves temporary files in
+accept TCP connections from the local host, and R saves temporary files in
 the `/tmp` directory of the machine where it is running. To make the
 communication between local Vim and remote R possible, the remote R has to
 know the IP address of the local machine and one remote directory must be
 mounted locally. Below is an example of how to achieve this goal.
 
-  1. Setup the remote machine to accept ssh login from the local machine
-     without a password (search the command `ssh-copy-id` over the Internet to
-     discover how to do it).
+  1. Set up the remote machine to accept ssh login from the local machine
+     without a password (search for the command `ssh-copy-id` on the Internet
+     to find out how to do it).
 
   2. Edit your `~/.Rprofile` on the remote machine (recommended):
 
@@ -103,7 +103,7 @@ mounted locally. Below is an example of how to achieve this goal.
        installed on the remote machine.
 
      - If vimcom is not automatically installed, you will have to
-       manually build vimcom, copy the source to the remote machine, access
+       manually build vimcom, copy the source to the remote machine, log into
        the remote machine, and install the package. Example:
 
        ```sh

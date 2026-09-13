@@ -1,8 +1,8 @@
 # Comment and uncomment code
 
 This is a feature that might be removed in the near future because it is
-better to use a plugin that will (un)comment code in many languages than
-having different key bindings just for R. Anyway, below is the old
+better to use a plugin that (un)comments code in many languages than to have
+different key bindings just for R. Anyway, below is the old
 documentation on this feature.
 
 Vim-R can comment and uncomment code, but this feature is turned off by
@@ -19,8 +19,7 @@ typing <LocalLeader>xx. The string used to comment the line will be "# ", "##
 `r_indent_ess_comments`.
 
 You can also add the string "# " to the beginning of a line by typing
-```
-LocalLeader>xc and remove it with <LocalLeader>xu. In this case, you can set
+<LocalLeader>xc and remove it with <LocalLeader>xu. In this case, you can set
 the value of `R_rcomment_string` to control what string will be added
 to the beginning of the line. Example:
 
@@ -42,11 +41,11 @@ after the last character in the line. If you are running <LocalLeader>; over a
 selection of lines, the comments will be aligned according to the longest
 line.
 
-Note: While typing comments the leader comment string is automatically added
+Note: While typing comments, the comment leader string is automatically added
 to new lines when you reach 'textwidth' but not when you press <Enter>.
 Please, read the Vim help about 'formatoptions' and `fo-table`. For example,
 you can add the following line to your `vimrc` if you want the comment string
-being added after <Enter>:
+to be added after <Enter>:
 
 ```vim
 autocmd FileType r setlocal formatoptions-=t formatoptions+=croql
@@ -68,7 +67,7 @@ let R_rcomment_string = '# '
 
 If the value of `r_indent_ess_comments` is 1, `R_rcomment_string` will be
 overridden and the string used to comment the line will change according to
-the value of `R_indent_commented` ("## " if 0 and "### " if 1; see
+the value of `R_indent_commented` ("## " if 1 and "### " if 0; see
 `ft-r-indent`).
 
 Below is the list of the names for custom key bindings:

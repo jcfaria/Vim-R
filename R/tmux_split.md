@@ -10,11 +10,12 @@ let R_external_term = 'tilix -a session-add-right -e'
 ```
 
 Anyway, it is still possible to run R in a Tmux split pane, as explained in
-this section, but I no longer use this feature and it is no longer supported.
-This means that I will not add new features to tmux-split and will not test if
-it still works after changes are introduced in other parts of the plugin.
-However, I may fix simple bugs if they are reported, and I will drop the
-integration in the future only if it becomes too buggy.
+this section, but this feature is no longer supported.
+This means that no new features will be added to tmux-split and that it will
+not be tested to check whether it still works after changes are introduced in
+other parts of the plugin.
+However, simple bugs may be fixed if they are reported, and the integration
+will be dropped in the future only if it becomes too buggy.
 
 If someone wants to maintain the code, then, the steps are:
 
@@ -23,8 +24,8 @@ If someone wants to maintain the code, then, the steps are:
   - Copy both `tmux_split.vim` and `tmux_split.md` (renamed as README.md) to
     the new repository.
 
-  - Tell me the link to the repository, so I can add the link to the "R_source"
-    section of the Vim-R documentation.
+  - Report the link to the repository, so that it can be added to the
+    "R_source" section of the Vim-R documentation.
 
 Currently, if you do want to try it, you should put in your `vimrc`:
 
@@ -42,16 +43,16 @@ exit
 
 In this case, when you start R, the terminal window is split into two regions:
 one for Vim and the other for Tmux. Then, it's useful to know some Tmux
-commands. After you finished editing the file, you have to type `exit` to quit
+commands. After you finish editing the file, you have to type `exit` to quit
 the Tmux session.
 
-**Note:** the old way of enabling Tmux split by setting the value of
-`R_tmux_split` no longer works.
+**Note:** the old way of enabling the Tmux split, by setting the value of
+`R_tmux_split`, no longer works.
 
 ## Tmux configuration
 
 You have to create your `~/.tmux.conf` if it does not exist yet. You may put
-the lines below in your `~/.tmux.conf` as a starting point to your own
+the lines below in your `~/.tmux.conf` as a starting point for your own
 configuration file:
 
 ```tmux.conf
@@ -91,8 +92,8 @@ bind -t vi-copy y copy-selection
 
 Tmux automatically renames window titles to the command currently running.
 Vim-R sets the title of the window where Vim and R are running to "VimR".
-This title will be visible only if Tmux status bar is "on", and it is useful
-only if you have created new windows with the
+This title will be visible only if the Tmux status bar is "on", and it is
+useful only if you have created new windows with the
 <kbd>Ctrl</kbd>+<kbd>a</kbd>+<kbd>c</kbd> command. You can change the value of
 `R_tmux_title` to either set a different title or let Tmux set the title
 automatically. Examples:
@@ -102,8 +103,8 @@ let R_tmux_title = 'Vim-R'
 let R_tmux_title = 'automatic'
 ```
 
-When R quits, Tmux will automatically close its pane. If you want that the
-pane remains open, see <https://github.com/jalvesaq/Vim-R/issues/229>
+When R quits, Tmux will automatically close its pane. If you want the pane to
+remain open, see <https://github.com/jalvesaq/Vim-R/issues/229>
 
 
 ## Key bindings and mouse support
@@ -112,7 +113,7 @@ The Tmux configuration file suggested above configures Tmux to use vi key
 bindings. It also configures Tmux to react to mouse clicks. You should be able
 to switch the active pane by clicking on an inactive pane, to resize the panes
 by clicking on the border line and dragging it, and to scroll the R Console
-with the mouse wheel. When you use the mouse wheel, Tmux enters in its
+with the mouse wheel. When you use the mouse wheel, Tmux enters its
 copy/scroll back mode (see below).
 
 The configuration script also sets <kbd>Ctrl</kbd>+<kbd>a</kbd> as the Tmux
@@ -121,7 +122,7 @@ to type <kbd>Ctrl</kbd>+<kbd>a</kbd> before typing a Tmux command. Below are the
 most useful key bindings for Tmux with the tmux.conf shown above:
 
 - <kbd>Ctrl</kbd>+<kbd>a</kbd>arrow keys: Move the cursor to the Tmux panel
-  above, below, at the right or at the left of the current one.
+  above, below, to the right or to the left of the current one.
 
 - <kbd>Ctrl</kbd>+<kbd>a</kbd>+<kbd>Ctrl</kbd>+<kbd>Up</kbd>: Move the panel
   division upward one line, that is, resize the panels. Repeat
@@ -130,12 +131,12 @@ most useful key bindings for Tmux with the tmux.conf shown above:
   split, you should use <kbd>Ctrl</kbd>+<kbd>Left</kbd> and
   <kbd>Ctrl</kbd>+<kbd>Right</kbd> to resize the panels.
 
-- <kbd>Ctrl</kbd>+<kbd>a</kbd>+<kbd>[</kbd>:Enter the copy/scroll back mode.
+- <kbd>Ctrl</kbd>+<kbd>a</kbd>+<kbd>[</kbd>: Enter the copy/scroll back mode.
   You can use <kbd>PgUp</kbd>, <kbd>PgDown</kbd> and vi key bindings to move
   the cursor around the panel. Press q to quit copy mode.
 
-- <kbd>Ctrl</kbd>+<kbd>a</kbd>+<kbd>]</kbd>: Paste the content of Tmux paste
-  buffer.
+- <kbd>Ctrl</kbd>+<kbd>a</kbd>+<kbd>]</kbd>: Paste the contents of the Tmux
+  paste buffer.
 
 - <kbd>Ctrl</kbd>+<kbd>a</kbd>+<kbd>z</kbd>: Hide/show all panes except the
   current one. Note: If you mistakenly press
@@ -150,7 +151,7 @@ While in the copy and scroll back mode, the following key bindings are useful:
 
 - <kbd>v</kbd>+<kbd>Space</kbd>: Start rectangular text selection.
 
-- <kbd>Enter</kbd>: Copy the selection to Tmux paste buffer.
+- <kbd>Enter</kbd>: Copy the selection to the Tmux paste buffer.
 
 Please, read the manual page of Tmux if you want to change the Tmux
 configuration and learn more commands. To read the Tmux manual, type in the
@@ -169,18 +170,18 @@ character, it will not be passed to applications running under Tmux. To send
 ## Copying and pasting
 
 You do not need to copy code from Vim to R because you can use the plugin's
-shortcuts to send the code. For pasting the output of R commands into Vim's
+shortcuts to send the code. For pasting the output of R commands into a Vim
 buffer, you can use the command `:Rinsert`. If you want to copy text from an
-application running inside the Tmux to another application also running in
+application running inside Tmux to another application also running in
 Tmux, as explained in the previous subsection, you can enter Tmux copy/scroll
 mode, select the text, copy it, switch to the other application pane and,
 then, paste.
 
 However, if you want to copy something from either Vim or R to another
 application not running inside Tmux, Tmux may prevent the X server from
-capturing the text selected by the mouse. This can be prevented by pressing
+capturing the text selected by the mouse. This can be avoided by pressing
 the <kbd>Shift</kbd> key, as it suspends the capturing of mouse events by
-tmux. If you keep <kbd>Shift</kbd> pressed while selecting text with the
+Tmux. If you keep <kbd>Shift</kbd> pressed while selecting text with the
 mouse, it will be available in the X server clipboard and can be inserted into
 other windows using the middle mouse button. It can also be inserted into a
-tmux window using <kbd>Shift</kbd> and the middle mouse button.
+Tmux window using <kbd>Shift</kbd> and the middle mouse button.
