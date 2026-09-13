@@ -604,44 +604,35 @@ endfunction
 
 function FillQuartoComplMenu()
     let s:qchunk_opt_list = []
+    let yaml_intel = 'share/editor/tools/yaml/yaml-intelligence-resources.json'
 
     if exists('g:R_quarto_intel')
-        let quarto_yaml_intel = g:R_quarto_intel
+        let quarto_yaml_intel = expand(g:R_quarto_intel)
     else
         let quarto_yaml_intel = ''
         if has('win32')
             let paths = split($PATH, ';')
             call filter(paths, 'v:val =~? "quarto"')
             if len(paths) > 0
-                let qjson = substitute(paths[0], 'bin$', 'share/editor/tools/yaml/yaml-intelligence-resources.json', '')
+                let qjson = substitute(paths[0], 'bin$', yaml_intel, '')
                 let qjson = substitute(qjson, '\\', '/', 'g')
                 if filereadable(qjson)
                     let quarto_yaml_intel = qjson
                 endif
             endif
         elseif executable('quarto')
-            let quarto_bin = system('which quarto')
-            let quarto_dir1 = substitute(quarto_bin, '\(.*\)/.\{-}/.*', '\1', 'g')
-            let quarto_yaml_intel = ''
-            if filereadable(quarto_dir1 . '/share/editor/tools/yaml/yaml-intelligence-resources.json')
-                let quarto_yaml_intel = quarto_dir1 . '/share/editor/tools/yaml/yaml-intelligence-resources.json'
-            else
-                let quarto_bin = system('readlink ' . quarto_bin)
-                let quarto_dir2 = substitute(quarto_bin, '\(.*\)/.\{-}/.*', '\1', 'g')
-                if quarto_dir2 =~ '^\.\./'
-                    while quarto_dir2 =~ '^\.\./'
-                        let quarto_dir2 = substitute(quarto_dir2, '^\.\./*', '', '')
-                    endwhile
-                    let quarto_dir2 = quarto_dir1 . '/' . quarto_dir2
+            let quarto_bin = exepath('quarto')
+            for quarto_dir in [fnamemodify(quarto_bin, ':h:h'),
+                        \ fnamemodify(resolve(quarto_bin), ':h:h')]
+                if filereadable(quarto_dir . '/' . yaml_intel)
+                    let quarto_yaml_intel = quarto_dir . '/' . yaml_intel
+                    break
                 endif
-                if filereadable(quarto_dir2 . '/share/editor/tools/yaml/yaml-intelligence-resources.json')
-                    let quarto_yaml_intel = quarto_dir2 . '/share/editor/tools/yaml/yaml-intelligence-resources.json'
-                endif
-            endif
+            endfor
         endif
     endif
 
-    if quarto_yaml_intel != ''
+    if filereadable(quarto_yaml_intel)
         let intel = json_decode(join(readfile(quarto_yaml_intel), "\n"))
         for key in ['schema/cell-attributes.yml',
                     \ 'schema/cell-cache.yml',
@@ -662,6 +653,10 @@ function FillQuartoComplMenu()
                 call add(s:qchunk_opt_list, dict)
             endfor
         endfor
+    else
+        call RWarningMsg('Could not read "yaml-intelligence-resources.json". ' .
+                    \ 'Completion of Quarto cell options is disabled. ' .
+                    \ 'Please, set the value of R_quarto_intel in your vimrc.')
     endif
 endfunction
 

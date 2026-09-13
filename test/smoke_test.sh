@@ -16,8 +16,9 @@
 #      that R produced and, for the Rnw file, on the arguments with which
 #      SyncTeX forward search invokes the PDF viewer,
 #   7. asserts that Quarto chunk-option completion is populated from quarto's
-#      yaml-intelligence-resources.json, which the test locates itself and
-#      hands to the plugin through R_quarto_intel.
+#      yaml-intelligence-resources.json, both when the plugin has to find that
+#      file by itself, starting from the quarto command on $PATH, and when it
+#      is handed the path through R_quarto_intel.
 #
 # Steps 3-7 are the point of the test: they only succeed if the whole chain
 # vimcom -> vimrserver -> editor is alive. An editor that starts and does
@@ -35,7 +36,9 @@
 #
 # Set VIMR_SMOKE_KEEP=1 to keep the scratch directory for inspection.
 # Set VIMR_SMOKE_QUARTO_INTEL=/path/to/yaml-intelligence-resources.json to
-# point the test at a Quarto installation it cannot find by itself.
+# point the R_quarto_intel assertion at a Quarto installation the harness
+# cannot find by itself. It does not affect the auto-discovery assertion,
+# which is about what the plugin finds on its own.
 #
 # Exit status is 0 only if every assertion passed in *both* editors. Assertions
 # whose external tool is missing are reported as SKIP; a SKIP is never counted
@@ -293,6 +296,18 @@ elif ! has_r_pkg quarto; then
     HAVE_QMD=0; WHY_QMD="the R package 'quarto' is not installed"
 fi
 
+# Auto-discovery is what the plugin does with nothing but the quarto command on
+# $PATH, so the quarto command is the only thing that may make it SKIP. If
+# quarto is there and the resource is not reachable from it, that is a failure
+# of the code under test, not a missing dependency, and it must not be a SKIP.
+HAVE_QCOMPL=1; WHY_QCOMPL=""
+if ! command -v quarto >/dev/null 2>&1; then
+    HAVE_QCOMPL=0; WHY_QCOMPL="the 'quarto' command is not in \$PATH"
+fi
+
+# Only for the R_quarto_intel assertion: the path the harness finds by itself,
+# with its own logic, so that the option is asserted against a known-good file
+# instead of against whatever the plugin happened to discover.
 QUARTO_INTEL="$(find_quarto_intel || true)"
 
 printf '  %-22s %s\n' "Rnw -> pdf:" \
@@ -302,7 +317,9 @@ printf '  %-22s %s\n' "Rmd -> html:" \
 printf '  %-22s %s\n' "qmd -> html:" \
     "$([ "$HAVE_QMD" -eq 1 ] && echo "available (quarto $(quarto --version 2>/dev/null))" || echo "SKIP: $WHY_QMD")"
 printf '  %-22s %s\n' "Quarto completion:" \
-    "$([ -n "$QUARTO_INTEL" ] && echo "$QUARTO_INTEL" || echo "SKIP: yaml-intelligence-resources.json not found")"
+    "$([ "$HAVE_QCOMPL" -eq 1 ] && echo "auto-discovery from $(command -v quarto)" || echo "SKIP: $WHY_QCOMPL")"
+printf '  %-22s %s\n' "R_quarto_intel:" \
+    "$([ -n "$QUARTO_INTEL" ] && echo "$QUARTO_INTEL" || echo "SKIP: the harness did not find yaml-intelligence-resources.json")"
 
 # ------------------------------------------------------------------ fixtures --
 
@@ -391,14 +408,10 @@ let R_external_term = 0
 let R_wait = 60
 let R_openpdf = 0
 let R_openhtml = 0
-$(if [ -n "$QUARTO_INTEL" ]; then
-    # Point the completion at the resource the harness found, instead of
-    # letting the plugin look for it with system('which quarto'). What is
-    # under test here is that the resource is read and turned into completion
-    # candidates, in both editors; making that depend on a shell call would
-    # make the gate flaky.
-    printf "let R_quarto_intel = '%s'" "$QUARTO_INTEL"
-fi)
+
+" R_quarto_intel is deliberately left unset here: the completion assertion
+" exercises the plugin's own search for yaml-intelligence-resources.json. The
+" option is asserted separately, by setting it at run time.
 
 " Move to a window that is not the R Console: an ex command such as :edit
 " cannot run in a terminal buffer whose job is alive.
@@ -539,12 +552,28 @@ call writefile([&filetype], '$OUT/ft_qmd')
 call RQuarto("render")
 EOF
 
+# Auto-discovery: g:R_quarto_intel must not exist, otherwise the assertion
+# would be about the option and not about the search. FillQuartoComplMenu() is
+# called explicitly so that the search runs even if the list was already built.
 cat > "$WORK/act_qcompl.vim" <<EOF
 call SmokeGoToEditorWin()
+call writefile([string(exists('g:R_quarto_intel'))], '$OUT/qintel_set.txt')
+call FillQuartoComplMenu()
 call writefile(map(copy(CompleteQuartoCellOptions('fig-')), 'v:val["abbr"]'),
             \\ '$OUT/qcompl_fig.txt')
 call writefile(map(copy(CompleteQuartoCellOptions('label')), 'v:val["abbr"]'),
             \\ '$OUT/qcompl_label.txt')
+EOF
+
+# The documented option, given as a '~' path to also cover its expansion. The
+# link lives in the scratch HOME, so nothing outside /tmp is written.
+cat > "$WORK/act_qcompl_opt.vim" <<EOF
+call SmokeGoToEditorWin()
+let g:R_quarto_intel = '~/quarto-intel.json'
+call FillQuartoComplMenu()
+call writefile(map(copy(CompleteQuartoCellOptions('fig-')), 'v:val["abbr"]'),
+            \\ '$OUT/qcompl_opt.txt')
+unlet g:R_quarto_intel
 EOF
 
 cat > "$WORK/act_quit.vim" <<EOF
@@ -748,17 +777,38 @@ run_document_checks() { # run_document_checks <name> <proj-dir>
     fi
 
     # Chunk-option completion, which reads quarto's yaml intelligence file.
-    if [ -n "$QUARTO_INTEL" ]; then
+    # First from the plugin's own search, then from R_quarto_intel.
+    if [ "$HAVE_QCOMPL" -eq 1 ]; then
         act qcompl
         if wait_until 30 "file_has qcompl_fig.txt 'fig-cap' && file_has qcompl_label.txt 'label'"; then
-            pass "$name: Quarto chunk-option completion offers fig-cap and label"
+            if file_is qintel_set.txt 0; then
+                pass "$name: Quarto completion found yaml-intelligence-resources.json by itself"
+            else
+                fail "$name: R_quarto_intel was set, so auto-discovery was not exercised"
+            fi
         else
-            fail "$name: Quarto chunk-option completion is empty or wrong"
+            fail "$name: Quarto chunk-option completion is empty or wrong (auto-discovery)"
             info "fig-: $(tr '\n' ' ' < "$OUT/qcompl_fig.txt" 2>/dev/null)"
             info "label: $(tr '\n' ' ' < "$OUT/qcompl_label.txt" 2>/dev/null)"
+            info "warning: $(grep -F 'yaml-intelligence-resources' "$OUT/messages.txt" 2>/dev/null | tail -1)"
         fi
     else
-        skip "$name: Quarto chunk-option completion (editor/tools/yaml/yaml-intelligence-resources.json not found; set VIMR_SMOKE_QUARTO_INTEL)"
+        skip "$name: Quarto chunk-option completion, auto-discovery ($WHY_QCOMPL)"
+    fi
+
+    if [ -n "$QUARTO_INTEL" ]; then
+        ln -sfn "$QUARTO_INTEL" "$HOME/quarto-intel.json"
+        act qcompl_opt
+        if wait_until 30 "file_has qcompl_opt.txt 'fig-cap'"; then
+            pass "$name: Quarto completion honours R_quarto_intel"
+        else
+            fail "$name: Quarto chunk-option completion is empty or wrong (R_quarto_intel)"
+            info "fig-: $(tr '\n' ' ' < "$OUT/qcompl_opt.txt" 2>/dev/null)"
+            info "warning: $(grep -F 'yaml-intelligence-resources' "$OUT/messages.txt" 2>/dev/null | tail -1)"
+        fi
+        rm -f "$HOME/quarto-intel.json"
+    else
+        skip "$name: Quarto chunk-option completion, R_quarto_intel (the harness did not find yaml-intelligence-resources.json; set VIMR_SMOKE_QUARTO_INTEL)"
     fi
 }
 

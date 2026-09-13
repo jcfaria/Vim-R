@@ -2261,6 +2261,10 @@ a Quarto document. If Vim-R fails to find the file, you can set the value of
 >vim
    let R_quarto_intel = '~/Downloads/quarto-1.1.251/share/editor/tools/yaml/yaml-intelligence-resources.json'
 <
+If the file can be read neither at the value of `R_quarto_intel` nor at the
+place where Vim-R looks for it, a warning is issued and completion of Quarto
+cell options is disabled.
+
 Omni completion in Rnoweb files will include results from bib file entries
 (requiring Python 3 and python3-pybtex): required for omni completion of
 citation keys (following |R_cite_pattern|) in Rnoweb documents.
@@ -2604,6 +2608,13 @@ See also: |R_source|.
    recovers from a stale R terminal state instead of believing that R is
    still running; and no spurious warning is issued when R is terminated by
    closing its terminal buffer, on either editor.
+ * Look for quarto's `yaml-intelligence-resources.json`, which completion of
+   Quarto cell options depends on, with `exepath()` and `resolve()` instead
+   of `which` and `readlink`: no shell is run any longer, the search also
+   succeeds when the `quarto` command is a chain of symbolic links or a
+   plain file, and R_quarto_intel now accepts a path starting with "~". A
+   warning is issued if the file cannot be read, instead of silently
+   offering no completion at all.
 
 0.9.21 (2025-04-15)
 
