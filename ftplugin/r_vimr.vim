@@ -79,6 +79,12 @@ call RCreateMaps('ni', 'RShowRout',  'ao', ':call ShowRout()')
 " -------------------------------------
 call RCreateMaps('ni', 'RSpinFile',  'ks', ':call RSpin()')
 
+" Note comments
+" -------------------------------------
+call RCreateMaps('n', 'RNextNote',     'gs', ':call RNoteGoTo(1)')
+call RCreateMaps('n', 'RPreviousNote', 'gS', ':call RNoteGoTo(-1)')
+call RCreateMaps('n', 'RNoteOutline',  'go', ':call RNoteOutline()')
+
 call RCreateSendMaps()
 call RControlMaps()
 call RCreateMaps('nvi', 'RSetwd',    'rd', ':call RSetWD()')

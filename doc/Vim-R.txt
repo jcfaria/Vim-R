@@ -390,6 +390,10 @@ Edit
   --------------------------------------------------------
   . Go (next R chunk)                                  \gn
   . Go (previous R chunk)                              \gN
+  --------------------------------------------------------
+  . Go (next note)                                     \gs
+  . Go (previous note)                                 \gS
+  . Outline of the notes                               \go
 -----------------------------------------------------------
 
 Object Browser
@@ -924,6 +928,8 @@ the superfluous command `syntax enable`. For details, see:
 |R_note_hl|             Compute the colors of the note comments
 |R_note_hl_base|        Highlight group the colors of the notes come from
 |R_note_hl_amount|, |R_note_hl_amount3|  How much a note differs from a comment
+|Vim-R-notes|           Navigation and outline of the note comments
+|R_note_sections|       Recognize the section markers of RStudio
 |R_routnotab|           Show output of R CMD BATCH in new window
 |R_notmuxconf|          Don't use a specially built Tmux config file
 |R_rconsole_height|     Number of lines of R Console
@@ -1548,7 +1554,8 @@ Besides the usual highlighting of comments, Vim-R highlights three levels of
 
 The whole comment is highlighted, the marker included, and four or more dots
 are still a note of level 3. The notes are also highlighted in the R code
-chunks of Rnoweb, R Markdown and Quarto documents.
+chunks of Rnoweb, R Markdown and Quarto documents. See |Vim-R-notes| to walk
+the hierarchy that the notes build and to list it.
 
 The three groups are linked to `Note_1`, `Note_2` and `Note_3`, whose colors
 are not fixed: they are computed from the colorscheme, and recomputed
@@ -2473,6 +2480,53 @@ Example:
    let R_term_title = 'Terminal'
 <
 
+------------------------------------------------------------------------------
+6.40. Navigation and outline of the note comments                *Vim-R-notes*
+                                                             *R_note_sections*
+
+The note comments described in |R-note-comments| structure a script
+hierarchically, and Vim-R can walk that hierarchy and show it. In R buffers,
+the following commands are available in Normal mode:
+
+   [count]<LocalLeader>gs : go to the next note
+   [count]<LocalLeader>gS : go to the previous note
+   <LocalLeader>go        : list the notes of the buffer
+
+A note is a title only if its marker is at the beginning of the line; the
+highlighting also marks a note written after code, but a title has to be a
+line of its own.
+
+The `[count]` is the deepest level to stop at, and not the number of notes to
+jump over: `1<LocalLeader>gs` goes to the next note of level 1, ignoring the
+levels 2 and 3, and `2<LocalLeader>gs` ignores the level 3. Without a count,
+the cursor goes to the next note of any level. Note that this differs from
+the chunk commands <LocalLeader>gn and <LocalLeader>gN, where the count is
+the number of chunks to jump over. Walking the level 1 titles alone is what
+serves a lecture, and jumping over three titles is of no use.
+
+The command <LocalLeader>go, or `:RNoteOutline`, fills the location list with
+the notes of the current buffer and opens it, showing the hierarchy by
+indentation, as the `Contents` panel of Tinn-R does:
+>
+       4  Section one
+       6      Subsection 1.1
+       8          Sub-sub 1.1.1
+      10      Subsection 1.2
+      12  Section two
+<
+The location list is local to the window, so your |quickfix| list is left
+alone, and |:lnext|, |:lprevious| and <CR> work on the notes at once. Only
+the current buffer is listed.
+
+By default, a comment ending in four or more `-`, `=` or `#` characters,
+which is the convention of RStudio to mark a section, is a title of level 1
+as well. The dots have precedence, so a note of yours that happens to end in
+four dashes is still governed by its dots. If you prefer that nothing but the
+dots is recognized, put in your |vimrc|:
+>vim
+   let R_note_sections = 0
+<
+
 ==============================================================================
 7. Custom key bindings                                   *Vim-R-key-bindings*
 
@@ -2518,6 +2572,9 @@ the list of the names for custom key bindings (the prefix RE means "echo"; RD,
    RIndent
    RNextRChunk
    RPreviousRChunk
+   RNextNote
+   RPreviousNote
+   RNoteOutline
 
    Send line or part of it to R:
    RSendLine
@@ -2703,6 +2760,15 @@ See also: |R_source|.
    overridden and also survives a change of colorscheme. New options:
    R_note_hl, R_note_hl_base, R_note_hl_amount and R_note_hl_amount3. See
    |R-note-comments|.
+ * Walk the hierarchy that the note comments build, and list it:
+   [count]<LocalLeader>gs and [count]<LocalLeader>gS go to the next and to
+   the previous note, where the count is the deepest level to stop at, and
+   <LocalLeader>go, or the new command :RNoteOutline, fills the location list
+   with the notes of the buffer, showing the hierarchy by indentation, as the
+   Contents panel of Tinn-R does. Both are inert in a file without notes. The
+   new option R_note_sections makes a comment ending in four or more "-", "="
+   or "#" characters, which is the convention of RStudio, a title of level 1
+   as well. See |Vim-R-notes|.
  * Fix bibliographic completion with R_python3: the check tested the literal
    string "g:R_python3" instead of the value of the option, so any
    interpreter set in R_python3 was rejected as "not found" and completion

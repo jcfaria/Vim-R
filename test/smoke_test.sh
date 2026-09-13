@@ -323,6 +323,10 @@ printf '  %-22s %s\n' "R_quarto_intel:" \
 
 # ------------------------------------------------------------------ fixtures --
 
+# The level of every line of smoke.R: three lines of code, then the notes,
+# with the RStudio section of line 14 as a sibling of the level 1 notes.
+SMOKE_NOTE_LEVELS='00010203020101030'
+
 # Written into a per-editor directory, so that a file produced by the first
 # editor can never be mistaken for a file produced by the second.
 make_fixtures() { # make_fixtures <dir>
@@ -332,7 +336,7 @@ make_fixtures() { # make_fixtures <dir>
     # The note comments are what the highlighting, the folding, the navigation
     # and the outline are asserted on. They are comments, so neither R nor the
     # assertions on the R Console and on the Object Browser are affected. The
-    # line numbers matter: see SMOKE_NOTE_LEVELS below.
+    # line numbers matter: see SMOKE_NOTE_LEVELS.
     cat > "$d/smoke.R" <<'EOF'
 cat("VIMR_SMOKE_SUM:", sum(1:100), "\n")
 smoke_df <- data.frame(alpha = 1:3, beta = c("x", "y", "z"))
@@ -641,6 +645,42 @@ call add(s:l, 'reset ' .
 call writefile(s:l, '$OUT/note_user_hl.txt')
 EOF
 
+# Note comments: that the maps are bound, where the cursor lands with and
+# without a count, and the outline the location list is filled with. The local
+# leader is written as nr2char(92) so that no backslash has to survive the
+# heredoc.
+cat > "$WORK/act_notenav.vim" <<EOF
+call SmokeGoToEditorWin()
+edit! smoke.R
+let s:ll = nr2char(92)
+let s:l = []
+for s:k in ['gs', 'gS', 'go']
+    call add(s:l, s:k . ' ' . maparg(s:ll . s:k, 'n'))
+endfor
+call add(s:l, 'plug ' . maparg('<Plug>RNextNote', 'n'))
+call add(s:l, 'levels ' . join(map(range(1, line('\$')),
+            \\ 'RNoteLevel(getline(v:val))'), ''))
+for [s:tag, s:cnt, s:key, s:from, s:times] in [['next', '', 'gs', 1, 7],
+            \\ ['next1', '1', 'gs', 1, 3],
+            \\ ['prev1', '1', 'gS', line('\$'), 3]]
+    call cursor(s:from, 1)
+    let s:seq = []
+    for s:i in range(1, s:times)
+        execute 'normal ' . s:cnt . s:ll . s:key
+        call add(s:seq, line('.'))
+    endfor
+    call add(s:l, s:tag . ' ' . join(s:seq, ' '))
+endfor
+call writefile(s:l, '$OUT/note_nav.txt')
+
+call cursor(1, 1)
+call RNoteOutline()
+call writefile(['lnums ' . join(map(getloclist(0), 'v:val.lnum'), ' '),
+            \\ 'qflist ' . len(getqflist())] + getline(1, '\$'),
+            \\ '$OUT/note_outline.txt')
+close
+EOF
+
 cat > "$WORK/act_quit.vim" <<EOF
 if exists('*RQuit')
     call RQuit('nosave')
@@ -932,6 +972,44 @@ run_note_checks() { # run_note_checks <name>
         fail "$name: RNoteHlReset() did not hand Note_1 back to Vim-R"
         info "recorded: $(tr '\n' '/' < "$OUT/note_user_hl.txt" 2>/dev/null)"
     fi
+
+    act notenav
+    sleep 1
+
+    # The level of every line of the fixture, and where the cursor lands. A
+    # count is the deepest level to stop at, so 'next1' walks the level 1
+    # titles alone: lines 4, 12 and the RStudio section on line 14.
+    for want in 'gs :call RNoteGoTo(1)<CR>' \
+                'gS :call RNoteGoTo(-1)<CR>' \
+                'go :call RNoteOutline()<CR>' \
+                'plug :call RNoteGoTo(1)<CR>' \
+                "levels $SMOKE_NOTE_LEVELS" \
+                'next 4 6 8 10 12 14 16' \
+                'next1 4 12 14' \
+                'prev1 14 12 4'; do
+        if file_has note_nav.txt "$want"; then
+            pass "$name: note navigation: $want"
+        else
+            fail "$name: note navigation is not '$want'"
+            info "recorded: $(tr '\n' '/' < "$OUT/note_nav.txt" 2>/dev/null)"
+        fi
+    done
+
+    # The quickfix window strips the leading whitespace of the text field, so
+    # the indentation only survives through a 'quickfixtextfunc'.
+    for want in 'lnums 4 6 8 10 12 14 16' \
+                'qflist 0' \
+                '    4  Section one' \
+                '    6      Subsection 1.1' \
+                '    8          Sub-sub 1.1.1' \
+                '   14  Section three'; do
+        if file_has note_outline.txt "$want"; then
+            pass "$name: note outline: $want"
+        else
+            fail "$name: the note outline has no line '$want'"
+            info "recorded: $(tr '\n' '/' < "$OUT/note_outline.txt" 2>/dev/null)"
+        fi
+    done
 }
 
 # --------------------------------------------------------------- editor run --

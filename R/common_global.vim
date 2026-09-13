@@ -907,6 +907,7 @@ let g:R_note_hl           = get(g:, "R_note_hl",            1)
 let g:R_note_hl_base      = get(g:, "R_note_hl_base", "Comment")
 let g:R_note_hl_amount    = get(g:, "R_note_hl_amount",  0.45)
 let g:R_note_hl_amount3   = get(g:, "R_note_hl_amount3", 0.18)
+let g:R_note_sections     = get(g:, "R_note_sections",      1)
 let g:R_bib_compl         = get(g:, "R_bib_compl", ["rnoweb"])
 
 if type(g:R_bib_compl) == v:t_string
@@ -1100,6 +1101,8 @@ endif
 if g:R_note_hl
     exe "source " . substitute(g:rplugin.home, " ", "\\ ", "g") . "/R/note_hl.vim"
 endif
+
+exe "source " . substitute(g:rplugin.home, " ", "\\ ", "g") . "/R/note.vim"
 
 if has("gui_running")
     exe "source " . substitute(g:rplugin.home, " ", "\\ ", "g") . "/R/gui_running.vim"
