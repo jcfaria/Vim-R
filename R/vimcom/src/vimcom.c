@@ -1,4 +1,3 @@
-#define ENABLE_LEGACY_NONAPI_FUNS
 #include <R.h> /* to include Rconfig.h */
 #include <Rversion.h>
 #include <Rdefines.h>
@@ -43,8 +42,7 @@
 #define R_INTERFACE_PTRS 1
 extern int (*ptr_R_ReadConsole)(const char *, unsigned char *, int, int);
 static int (*save_ptr_R_ReadConsole)(const char *, unsigned char *, int, int);
-static int debugging;           // Is debugging a function now?
-LibExtern SEXP R_SrcfileSymbol; // R internal variable defined in Defn.h.
+static int debugging; // Is debugging a function now?
 static void SrcrefInfo(void);
 #endif
 static int debug_r; // Should detect when `browser()` is running and start
@@ -56,6 +54,8 @@ static int verbose = 0;  // 1: version number; 2: initial information; 3: TCP in
                          // and out; 4: more verbose; 5: really verbose.
 static int allnames = 0; // Show hidden objects in omni completion and
                          // Object Browser?
+static int is_promise = 0; // Is the next object to be listed a promise whose
+                           // value must not be evaluated?
 static int nlibs = 0;    // Number of loaded libraries.
 static int needs_lib_msg = 0;    // Did the number of libraries change?
 static int needs_glbenv_msg = 0; // Did .GlobalEnv change?
@@ -445,6 +445,11 @@ static LibInfo *vimcom_get_lib(const char *nm) {
  */
 static char *vimcom_glbnv_line(SEXP *x, const char *xname, const char *curenv,
                                 char *p, int depth) {
+    // Only the object at the top of the recursion may be a promise that was
+    // not evaluated. See vimcom_globalenv_list().
+    int lazy = is_promise;
+    is_promise = 0;
+
     if (depth > maxdepth)
         return p;
 
@@ -467,7 +472,9 @@ static char *vimcom_glbnv_line(SEXP *x, const char *xname, const char *curenv,
     escape_str(ebuf);
     p = vimcom_strcat(p, ebuf);
 
-    if (Rf_isLogical(*x)) {
+    if (lazy) {
+        p = vimcom_strcat(p, "\006&\006");
+    } else if (Rf_isLogical(*x)) {
         p = vimcom_strcat(p, "\006%\006");
     } else if (Rf_isNumeric(*x)) {
         p = vimcom_strcat(p, "\006{\006");
@@ -676,13 +683,44 @@ static void vimcom_globalenv_list(void) {
 #endif
     for (int i = 0; i < Rf_length(envVarsSEXP); i++) {
         varName = CHAR(STRING_ELT(envVarsSEXP, i));
-        if (R_BindingIsActive(Rf_install(varName), R_GlobalEnv)) {
+        SEXP varSym = Rf_install(varName);
+#if defined(R_VERSION) && R_VERSION >= R_Version(4, 6, 0)
+        /* R_getVarEx() is like `get()`: it evaluates promises, but objects
+           created by `data()` and `delayedAssign()` must be listed without
+           being evaluated, as Rf_findVar() did until R 4.5. So, the type of
+           the binding has to be checked first. */
+        switch (R_GetBindingType(varSym, R_GlobalEnv)) {
+        case R_BindingTypeActive:
             // See: https://github.com/jalvesaq/Vim-R/issues/686
-            PROTECT(varSEXP = R_ActiveBindingFunction(Rf_install(varName),
-                                                      R_GlobalEnv));
-        } else {
-            PROTECT(varSEXP = Rf_findVar(Rf_install(varName), R_GlobalEnv));
+            PROTECT(varSEXP = R_ActiveBindingFunction(varSym, R_GlobalEnv));
+            break;
+        case R_BindingTypeDelayed:
+            is_promise = 1;
+            PROTECT(varSEXP = R_DelayedBindingExpression(varSym, R_GlobalEnv));
+            break;
+        case R_BindingTypeForced:
+            is_promise = 1;
+            PROTECT(varSEXP = R_ForcedBindingExpression(varSym, R_GlobalEnv));
+            break;
+        case R_BindingTypeMissing:
+            // R_getVarEx() would raise an error
+            PROTECT(varSEXP = R_MissingArg);
+            break;
+        case R_BindingTypeUnbound:
+            PROTECT(varSEXP = R_UnboundValue); // should never happen
+            break;
+        default:
+            PROTECT(varSEXP =
+                        R_getVarEx(varSym, R_GlobalEnv, TRUE, R_UnboundValue));
         }
+#else
+        if (R_BindingIsActive(varSym, R_GlobalEnv)) {
+            // See: https://github.com/jalvesaq/Vim-R/issues/686
+            PROTECT(varSEXP = R_ActiveBindingFunction(varSym, R_GlobalEnv));
+        } else {
+            PROTECT(varSEXP = Rf_findVar(varSym, R_GlobalEnv));
+        }
+#endif
         if (varSEXP != R_UnboundValue) {
             // should never be unbound
             p = vimcom_glbnv_line(&varSEXP, varName, "", p, 0);
@@ -834,7 +872,7 @@ static void vimcom_checklibs(void) {
 
     SEXP l, cmdSexp, cmdexpr, ans;
     const char *libname;
-    char *libn;
+    const char *libn;
     char buf[128];
     ParseStatus status;
     int er = 0;
@@ -987,37 +1025,47 @@ static void vimcom_fire(void) {
 }
 
 /**
- * @brief Read an R's internal variable to get file name and line number of
- * function currently being debugged.
+ * @brief Get file name and line number of function currently being debugged
+ * from the source reference of the code being evaluated.
  */
 static void SrcrefInfo(void) {
-    // Adapted from SrcrefPrompt(), at src/main/eval.c
     if (debugging == 0) {
         send_to_vim("call StopRDebugging()");
         return;
     }
-    /* If we have a valid R_Srcref, use it */
-    if (R_Srcref && R_Srcref != R_NilValue) {
-        if (TYPEOF(R_Srcref) == VECSXP)
-            R_Srcref = VECTOR_ELT(R_Srcref, 0);
-        SEXP srcfile = getAttrib(R_Srcref, R_SrcfileSymbol);
-        if (TYPEOF(srcfile) == ENVSXP) {
-            SEXP filename = findVar(install("filename"), srcfile);
-            if (isString(filename) && length(filename)) {
-                size_t slen = strlen(CHAR(STRING_ELT(filename, 0)));
-                char *buf = calloc(sizeof(char), (2 * slen + 32));
-                char *buf2 = calloc(sizeof(char), (2 * slen + 32));
-                snprintf(buf, 2 * slen + 1, "%s",
-                         CHAR(STRING_ELT(filename, 0)));
-                vimcom_squo(buf, buf2, 2 * slen + 32);
-                snprintf(buf, 2 * slen + 31, "call RDebugJump('%s', %d)", buf2,
-                         asInteger(R_Srcref));
-                send_to_vim(buf);
-                free(buf);
-                free(buf2);
-            }
-        }
+    /* The current source reference is the one of the code being evaluated or,
+     * if it has none, the first one found in the call stack. Until R 4.4.x,
+     * `skip = 0` requested this search; since R 4.5.0, it is requested with
+     * `skip = NA_INTEGER` because `skip = 0` now means the top of the call
+     * stack. */
+#if defined(R_VERSION) && R_VERSION >= R_Version(4, 5, 0)
+    SEXP srcref = R_GetCurrentSrcref(NA_INTEGER);
+#else
+    SEXP srcref = R_GetCurrentSrcref(0);
+#endif
+    if (!srcref || srcref == R_NilValue)
+        return;
+
+    PROTECT(srcref);
+    if (TYPEOF(srcref) == VECSXP && Rf_length(srcref) > 0)
+        srcref = VECTOR_ELT(srcref, 0);
+    SEXP filename;
+    PROTECT(filename = R_GetSrcFilename(srcref));
+    // R_GetSrcFilename() returns "" if the source reference has no file name
+    if (isString(filename) && length(filename) &&
+        CHAR(STRING_ELT(filename, 0))[0] != 0) {
+        size_t slen = strlen(CHAR(STRING_ELT(filename, 0)));
+        char *buf = calloc(sizeof(char), (2 * slen + 32));
+        char *buf2 = calloc(sizeof(char), (2 * slen + 32));
+        snprintf(buf, 2 * slen + 1, "%s", CHAR(STRING_ELT(filename, 0)));
+        vimcom_squo(buf, buf2, 2 * slen + 32);
+        snprintf(buf, 2 * slen + 31, "call RDebugJump('%s', %d)", buf2,
+                 asInteger(srcref));
+        send_to_vim(buf);
+        free(buf);
+        free(buf2);
     }
+    UNPROTECT(2);
 }
 
 /**

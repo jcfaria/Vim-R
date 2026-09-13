@@ -2503,6 +2503,15 @@ See also: |R_source|.
 
  * Rename Nvim-R as Vim-R, and nvimcom as vimcom.
  * Remove support for Neovim.
+ * vimcom: replace the non-API entry points Rf_findVar() and R_SrcfileSymbol
+   with the documented R_getVarEx(), R_GetBindingType(), R_GetCurrentSrcref()
+   and R_GetSrcFilename(), and drop ENABLE_LEGACY_NONAPI_FUNS. R >= 4.6.0
+   hides the old entry points, and vimcom would fail either to build or to
+   load. Objects created by data() and delayedAssign() are still listed in
+   the Object Browser without being evaluated. Building with R < 4.6.0
+   remains supported.
+ * vimcom: fix a compilation warning with glibc >= 2.43, which declares
+   strstr() as const-generic.
  * Fix \rr and \rm printing "^L" in the R Console instead of clearing it:
    newer Tmux versions sanitize control characters when pasting, and now the
    paste-buffer flag -S is used to disable the sanitizing, when available.
