@@ -83,9 +83,16 @@ function ROnJobExit(job_id, stts)
     if key != "Job"
         let g:rplugin.jobs[key] = "no"
     endif
-    " Closing R's terminal sends it SIGHUP (128 + 1). That is an expected exit,
-    " not an error worth showing to the user.
-    if a:stts != 0 && !(key ==# 'R' && a:stts == 129)
+    " Closing R's terminal buffer terminates R by a signal. That is an expected
+    " exit, not an error worth showing to the user. Vim reports -1 for every
+    " job killed by a signal and names the signal in job_info().termsig, unlike
+    " Neovim, which reports 128 + the signal number (see R/nvimrcom.vim).
+    let expected = 0
+    if key ==# 'R' && a:stts == -1
+        let expected = index(['hup', 'term', 'kill'],
+                    \ get(job_info(a:job_id), 'termsig', '')) >= 0
+    endif
+    if a:stts != 0 && !expected
         call RWarningMsg('"' . key . '"' . ' exited with status ' . a:stts)
     endif
     if key ==# 'R'
