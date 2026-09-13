@@ -969,6 +969,7 @@ the superfluous command `syntax enable`. For details, see:
 |R_fun_data_2|          Where the data.frame to complete function arguments is
 |R_quarto_intel|        Where the Quarto completion data is
 |R_bib_compl|           List of file types for bib completion
+|R_python3|             Python 3 interpreter for bib completion
 |R_remote_compldir|     Mount point of remote cache directory
 |Vim-R-df-view|        Options for visualizing a data.frame or matrix
 |Vim-R-SyncTeX|        Options for SyncTeX
@@ -2235,6 +2236,7 @@ want to know what they are, while editing an R file, do in Normal mode:
                                                               *R_fun_data_2*
                                                               *R_quarto_intel*
                                                               *R_bib_compl*
+                                                              *R_python3*
 
 You can define in your |vimrc| the list of file types supported by Vim-R that
 should have Vim's traditional omni completion enabled. Example:
@@ -2297,6 +2299,15 @@ file types if you include them in the list `R_bib_compl`. Example:
 >vim
    let R_bib_compl = ['rnoweb', 'rmd', 'quarto']
 <
+By default, Vim-R runs the first of `python3` and `python` on `$PATH` that is
+Python 3. If the interpreter with the PyBTeX library installed is not the one
+that would be found in this way, set `R_python3` in your |vimrc| to either
+the name of a command on `$PATH` or the path of an executable file. Example:
+>vim
+   let R_python3 = '~/.venv/bib/bin/python3'
+<
+A warning is issued and completion of citation keys is disabled if the value
+of `R_python3` is neither a command on `$PATH` nor an executable file.
 However, there are alternative plugins for completing bib keys that work
 better than Vim-R. Examples:
 
@@ -2643,6 +2654,14 @@ See also: |R_source|.
    comment is highlighted, and the new highlight groups rNote1, rNote2 and
    rNote3 are linked to standard groups, so that they follow the colorscheme
    and can be redefined in the |vimrc|. See |R-note-comments|.
+ * Fix bibliographic completion with R_python3: the check tested the literal
+   string "g:R_python3" instead of the value of the option, so any
+   interpreter set in R_python3 was rejected as "not found" and completion
+   of citation keys was silently disabled. The value is now looked up with
+   `executable()`, which accepts both a command on $PATH and the path of an
+   executable file, a path starting with "~" is expanded, and a warning is
+   issued when the interpreter cannot be used. The option is documented
+   now. See |R_python3|.
 
 0.9.21 (2025-04-15)
 

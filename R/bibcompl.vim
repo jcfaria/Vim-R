@@ -57,16 +57,19 @@ endfunction
 
 function s:HasPython3()
     if exists("g:R_python3")
-        if filereadable("g:R_python3")
-            if executable("g:R_python3")
-                let g:rplugin.py3 = g:R_python3
-                return 1
-            else
-                let g:rplugin.debug_info['BibComplete'] = g:R_python3 . ' is not executable'
-            endif
+        let py3 = expand(g:R_python3)
+        if executable(py3)
+            let g:rplugin.py3 = py3
+            return 1
+        endif
+        if filereadable(py3)
+            let g:rplugin.debug_info['BibComplete'] = g:R_python3 . ' is not executable'
         else
             let g:rplugin.debug_info['BibComplete'] = g:R_python3 . ' not found'
         endif
+        call RWarningMsg(g:rplugin.debug_info['BibComplete'] .
+                    \ '. Bibliographic completion is disabled. ' .
+                    \ 'Please, check the value of R_python3 in your vimrc.')
         return 0
     endif
     silent let out = system('python3 --version')
