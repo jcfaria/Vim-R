@@ -21,9 +21,15 @@ function CheckVimcomVersion()
 
     " Run the script as a job, setting callback functions to receive its
     " stdout, stderr and exit code.
-    let jobh = {'out_cb':  'RInitStdout',
-                \ 'err_cb':  'RInitStderr',
-                \ 'exit_cb': 'RInitExit'}
+    if has('nvim')
+        let jobh = {'on_stdout': function('RInitStdout'),
+                    \ 'on_stderr': function('RInitStderr'),
+                    \ 'on_exit': function('RInitExit')}
+    else
+        let jobh = {'out_cb':  'RInitStdout',
+                    \ 'err_cb':  'RInitStderr',
+                    \ 'exit_cb': 'RInitExit'}
+    endif
 
     let s:RBout = []
     let s:RBerr = []
@@ -58,7 +64,11 @@ endfunction
 " Get the output of R CMD build and INSTALL
 let s:RoutLine = ''
 function RInitStdout(...)
-    let rcmd = substitute(a:2, '\r', '', 'g')
+    if has('nvim')
+        let rcmd = substitute(join(a:2), '\r', '', 'g')
+    else
+        let rcmd = substitute(a:2, '\r', '', 'g')
+    endif
     if s:RoutLine != ''
         let rcmd = s:RoutLine . rcmd
         if rcmd !~ "\x14"
@@ -93,7 +103,11 @@ function RInitStdout(...)
 endfunction
 
 function RInitStderr(...)
-    let s:RBerr += [substitute(a:2, '\r', '', 'g')]
+    if has('nvim')
+        let s:RBerr += [substitute(join(a:2), '\r', '', 'g')]
+    else
+        let s:RBerr += [substitute(a:2, '\r', '', 'g')]
+    endif
 endfunction
 
 " Check if the exit code of the script that built vimcom was zero and if the
@@ -325,7 +339,11 @@ function s:BuildAllArgs(...)
     if exists("g:R_remote_compldir")
         let scrptnm = g:R_remote_compldir . "/tmp/build_args.R"
     endif
-    let jobh = {'exit_cb': 'BAAExit'}
+    if has('nvim')
+        let jobh = {'on_exit': function('BAAExit')}
+    else
+        let jobh = {'exit_cb': 'BAAExit'}
+    endif
     let g:rplugin.jobs["Build_args"] = StartJob([g:rplugin.Rcmd, "--quiet", "--no-save", "--no-restore", "--slave", "-f", scrptnm], jobh)
 endfunction
 
@@ -508,6 +526,11 @@ endif
 " 2023-10-23
 if exists('g:R_hi_fun_globenv')
     call RWarningMsg('R_hi_fun_globenv no longer exists.')
+endif
+
+" 2024-03-03
+if has("nvim-0.10.4") && $MYVIMRC =~ "init.lua" && ((rand(srand()) % 7 ) == 4)
+    call RWarningMsg('Vim-R was superseded by https://github.com/R-nvim/R.nvim')
 endif
 
 " 2025-08-08

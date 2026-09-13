@@ -1,7 +1,3 @@
-if has("nvim")
-    finish
-endif
-
 augroup rft
     au!
     autocmd BufRead *.Rhistory set ft=r

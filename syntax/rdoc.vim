@@ -2,10 +2,6 @@
 " Language:	R documentation
 " Maintainer:	Jakson A. Aquino <jalvesaq@gmail.com>
 
-if has("nvim")
-    finish
-endif
-
 if exists("b:current_syntax")
     finish
 endif

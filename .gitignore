@@ -1,4 +1,5 @@
 doc/tags
+nvim.log
 R/vimcom/src/*.o
 R/vimcom/src/apps/*.o
 R/vimcom/src/*.so

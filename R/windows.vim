@@ -125,7 +125,11 @@ function StartR_Windows()
     let g:SendCmdToR = function('SendCmdToR_NotYet')
 
     call SetRHome()
-    silent exe "!start " . g:rplugin.R . ' ' . join(g:R_args)
+    if has("nvim")
+        call system("start " . g:rplugin.R . ' ' . join(g:R_args))
+    else
+        silent exe "!start " . g:rplugin.R . ' ' . join(g:R_args)
+    endif
     call UnsetRHome()
 
     call WaitVimcomStart()

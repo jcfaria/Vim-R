@@ -1,11 +1,18 @@
-# Vim-R (superseded by R.nvim)
+# Vim-R
+
+Vim-R improves Vim's and Neovim's support for editing R scripts.
+
+The plugin was written by [Jakson Alves de Aquino](https://github.com/jalvesaq),
+who developed and maintained it for many years. It is now maintained by
+[jcfaria](https://github.com/jcfaria), a co-author of the original project,
+with the goal of keeping Vim-R working with traditional Vim. Contributions from
+anyone willing to help with its maintenance are welcome.
 
 > [!Note]
-> For Neovim users, this plugin is superseded by [R.nvim](https://github.com/R-nvim/R.nvim).
-> I no longer use Vim-R and will only fix newly reported bugs if they
-> are serious enough to prevent its use. I will not fix minor bugs.
-
-Vim-R improves Vim's support for editing R scripts.
+> We also intend to keep Vim-R working with Neovim, but we make no guarantees.
+> Users who work exclusively in Neovim are advised to consider
+> [R.nvim](https://github.com/R-nvim/R.nvim), which is developed specifically
+> for that editor.
 
 ## Installation and use
 
@@ -21,8 +28,8 @@ The black arrows represent all commands that you trigger in the editor and
 that you can see being pasted into R Console.
 There are three different ways of sending the commands to R Console:
 
-  - When running R in a Vim built-in terminal, the function `term_sendkeys()`
-    is used to send code to R Console.
+  - When running R in a built-in terminal, the function `term_sendkeys()`
+    (Vim) or `chansend()` (Neovim) is used to send code to R Console.
 
   - When running R in an external terminal emulator, Tmux is used to send
     commands to R Console.
@@ -50,3 +57,10 @@ highlighting to include newly loaded libraries and open the PDF output after
 knitting an Rnoweb file and compiling the LaTeX result. Most of the
 information is transmitted through the TCP connection to the *vimrserver*,
 but temporary files are used in a few cases.
+
+
+## See also:
+
+   - [languageserver](https://cran.r-project.org/web/packages/languageserver/index.html): a language server for R.
+
+   - [colorout](https://github.com/jalvesaq/colorout): a package to colorize R's output.

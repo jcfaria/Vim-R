@@ -9,10 +9,17 @@ function StartRStudio()
     if has("win32")
         call SetRHome()
     endif
-    let g:rplugin.jobs["RStudio"] = StartJob([g:RStudio_cmd], {
-                \ 'err_cb':  'ROnJobStderr',
-                \ 'exit_cb': 'ROnJobExit',
-                \ 'stoponexit': '' })
+    if has("nvim")
+        let g:rplugin.jobs["RStudio"] = StartJob([g:RStudio_cmd], {
+                    \ 'on_stderr': function('ROnJobStderr'),
+                    \ 'on_exit':   function('ROnJobExit'),
+                    \ 'detach': 1 })
+    else
+        let g:rplugin.jobs["RStudio"] = StartJob([g:RStudio_cmd], {
+                    \ 'err_cb':  'ROnJobStderr',
+                    \ 'exit_cb': 'ROnJobExit',
+                    \ 'stoponexit': '' })
+    endif
     if has("win32")
         call UnsetRHome()
     endif

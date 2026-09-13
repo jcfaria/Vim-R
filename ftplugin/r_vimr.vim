@@ -1,6 +1,3 @@
-if has("nvim")
-    finish
-endif
 
 if exists("g:R_filetypes") && type(g:R_filetypes) == v:t_list && index(g:R_filetypes, 'r') == -1
     finish
@@ -8,6 +5,9 @@ endif
 
 " Define some buffer variables common to R, Rnoweb, Rmd, Rrst, Rhelp and rdoc:
 exe "source " . substitute(expand("<sfile>:h:h"), ' ', '\ ', 'g') . "/R/common_buffer.vim"
+if exists("g:has_Rnvim")
+    finish
+endif
 
 function! GetRCmdBatchOutput(...)
     if filereadable(s:routfile)
@@ -43,8 +43,12 @@ function! ShowRout()
     else
         let rcmd = [g:rplugin.Rcmd, "CMD", "BATCH", "--no-restore", "--no-save", expand("%"),  s:routfile]
     endif
-    let rjob = job_start(rcmd, {'close_cb': function('GetRCmdBatchOutput')})
-    let g:rplugin.jobs["R_CMD"] = job_getchannel(rjob)
+    if has("nvim")
+        let g:rplugin.jobs["R_CMD"] = jobstart(rcmd, {'on_exit': function('GetRCmdBatchOutput')})
+    else
+        let rjob = job_start(rcmd, {'close_cb': function('GetRCmdBatchOutput')})
+        let g:rplugin.jobs["R_CMD"] = job_getchannel(rjob)
+    endif
 endfunction
 
 " Convert R script into Rmd, md and, then, html -- using knitr::spin()

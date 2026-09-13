@@ -77,3 +77,9 @@ Below is the list of the names for custom key bindings:
    RToggleComment
    RRightComment
 
+Note: It seems that, on OS X, if you put the command `syntax enable` in your
+`vimrc` (or `init.vim`), file type plugins are sourced immediately.
+Consequently, some Vim-R variables, such as `R_enable_comment`, are used with
+their default values even if you have set them in the same file. The
+workaround is not to include the superfluous command `syntax enable`. For
+details, see <https://github.com/jalvesaq/Vim-R/issues/668>.

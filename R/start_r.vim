@@ -30,9 +30,17 @@ unlet g:SignalToR
 "==============================================================================
 
 function s:RGetBufDir()
-    let rwd = expand("%:p:h")
-    if has("win32")
-        let rwd = substitute(rwd, '\\', '/', 'g')
+    if has('nvim')
+        let rwd = nvim_buf_get_name(0)
+        if has("win32")
+            let rwd = substitute(rwd, '\\', '/', 'g')
+        endif
+        let rwd = substitute(rwd, '\(.*\)/.*', '\1', '')
+    else
+        let rwd = expand("%:p:h")
+        if has("win32")
+            let rwd = substitute(rwd, '\\', '/', 'g')
+        endif
     endif
     return rwd
 endfunction
@@ -315,6 +323,27 @@ function SetVimcomInfo(vimcomversion, rpid, wid, r_info)
         let g:Rout_continue_str = substitute(g:Rout_continue_str, '.*#N#', '', '')
     endif
 
+    if has('nvim') && has_key(g:rplugin, "R_bufnr")
+        " Put the cursor and the end of the buffer to ensure automatic scrolling
+        " See: https://github.com/neovim/neovim/issues/2636
+        let isnormal = mode() ==# 'n'
+        let curwin = winnr()
+        exe 'sb ' . g:rplugin.R_bufnr
+        if !exists('g:R_hl_term')
+            if Rinfo[4] =~# '1'
+                let g:R_hl_term = 0
+            else
+                let g:R_hl_term = 1
+                set syntax=rout
+            endif
+        endif
+        call cursor('$', 1)
+        exe curwin . 'wincmd w'
+        if isnormal
+            stopinsert
+        endif
+    endif
+
     if IsJobRunning("Server")
         " Set RConsole window ID in vimrserver to ArrangeWindows()
         if has("win32")
@@ -423,6 +452,9 @@ function ClearRInfo()
         call system("tmux set automatic-rename on")
     endif
 
+    if type(g:R_external_term) == v:t_number && g:R_external_term == 0 && has("nvim")
+        call CloseRTerm()
+    endif
     call JobStdin(g:rplugin.jobs["Server"], "43\n")
 endfunction
 
@@ -559,6 +591,9 @@ function StartObjBrowser()
         sil set filetype=rbrowser
         let g:rplugin.curview = "GlobalEnv"
         let g:rplugin.ob_winnr = win_getid()
+        if has("nvim")
+            let g:rplugin.ob_buf = nvim_win_get_buf(g:rplugin.ob_winnr)
+        endif
 
         if exists('s:autosttobjbr') && s:autosttobjbr == 1
             let s:autosttobjbr = 0
@@ -610,8 +645,17 @@ endfunction
 "==============================================================================
 
 " No support for break points
+"if synIDattr(synIDtrans(hlID("SignColumn")), "bg") =~ '^#'
+"    exe 'hi def StopSign guifg=red guibg=' . synIDattr(synIDtrans(hlID("SignColumn")), "bg")
+"else
+"    exe 'hi def StopSign ctermfg=red ctermbg=' . synIDattr(synIDtrans(hlID("SignColumn")), "bg")
+"endif
+"call sign_define('stpline', {'text': '●', 'texthl': 'StopSign', 'linehl': 'None', 'numhl': 'None'})
 
-if &ambiwidth == "double" || has("win32")
+" Functions sign_define(), sign_place() and sign_unplace() require Neovim >= 0.4.3
+"call sign_define('dbgline', {'text': '▬▶', 'texthl': 'SignColumn', 'linehl': 'QuickFixLine', 'numhl': 'Normal'})
+
+if &ambiwidth == "double" || (has("win32") && !has("nvim"))
     sign define dbgline text==> texthl=SignColumn linehl=QuickFixLine
 else
     sign define dbgline text=▬▶ texthl=SignColumn linehl=QuickFixLine
@@ -738,7 +782,7 @@ function RDebugJump(fnm, lnum)
         exe ':' . flnum
     endif
 
-    " Call sign_place() and sign_unplace() when requiring Vim 8.2
+    " Call sign_place() and sign_unplace() when requiring Vim 8.2 and Neovim 0.5
     "call sign_unplace('rdebugcurline')
     "call sign_place(1, 'rdebugcurline', 'dbgline', fname, {'lnum': flnum})
     sign unplace 1
@@ -853,7 +897,10 @@ function RViewDF(oname, howto, txt)
         endif
 
         normal! :<Esc>
-        if has("win32")
+        if has("nvim")
+            let appcmd = split(cmd)
+            call jobstart(appcmd, {'detach': v:true})
+        elseif has("win32")
             silent exe '!start "' . g:R_csv_app . '" "' . tsvnm . '"'
         else
             call system(cmd . ' >' . s:null . ' 2>' . s:null . ' &')
@@ -1212,7 +1259,11 @@ endfunction
 
 " Send file to R
 function SendFileToR(e)
-    let fpath = expand("%:p") . ".tmp.R"
+    if has('nvim')
+        let fpath = nvim_buf_get_name(0) . ".tmp.R"
+    else
+        let fpath = expand("%:p") . ".tmp.R"
+    endif
 
     if filereadable(fpath)
         call RWarningMsg('Error: cannot create "' . fpath . '" because it already exists. Please, delete it.')
@@ -1795,7 +1846,13 @@ function RKnit()
 endfunction
 
 function StartTxtBrowser(brwsr, url)
-    exe 'terminal ++curwin ++close ' . a:brwsr . ' "' . a:url . '"'
+    if has("nvim")
+        tabnew
+        call termopen(a:brwsr . " " . a:url)
+        startinsert
+    else
+        exe 'terminal ++curwin ++close ' . a:brwsr . ' "' . a:url . '"'
+    endif
 endfunction
 
 function RSourceDirectory(...)
@@ -1975,7 +2032,11 @@ function RLoadHTML(fullpath, browser)
         let cmd = split(a:browser) + [a:fullpath]
     endif
 
-    call job_start(cmd)
+    if has('nvim')
+        call jobstart(cmd, {'detach': 1})
+    else
+        call job_start(cmd)
+    endif
 endfunction
 
 function ROpenDoc(fullpath, browser)

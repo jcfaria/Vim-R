@@ -6,7 +6,7 @@ Authors: Jakson A. Aquino   <jalvesaq@gmail.com>
          Jose Claudio Faria <joseclaudio.faria@gmail.com>
 
 Version: 1.0.0
-For Vim >= 8.2.84
+For Vim >= 8.2.84 or Neovim >= 0.6.0
 
  1. Overview                                    |Vim-R-overview|
  2. Main features                               |Vim-R-features|
@@ -21,7 +21,8 @@ For Vim >= 8.2.84
 ==============================================================================
 1. Overview                                                  *Vim-R-overview*
 
-This plugin improves Vim's support for editing R code. It is available at:
+This plugin improves Vim's and Neovim's support for editing R code. It is
+available at:
 
     https://github.com/jcfaria/Vim-R
 
@@ -90,6 +91,13 @@ Main dependencies:
       http://www.vim.org/download.php
       Vim must be compiled with |+channel|, |+job| and |+conceal| features.
       In Normal mode, do `:version` to check if your Vim has these features.
+
+   or Neovim >= 0.6.0:
+      https://github.com/neovim/neovim/releases
+      See also: https://github.com/neovim/neovim/wiki/Installing-Neovim
+
+      Note: If R.nvim is also installed, Vim-R does nothing on Neovim, and
+      you should read R.nvim's own documentation instead.
 
    R >= 4.1.0:
       http://www.r-project.org/
@@ -187,14 +195,14 @@ To see messages received by `vimcom`, put in your `~/.Rprofile`:
 >r
   options(vimcom.verbose = 5)
 <
-To see messages received by Vim, uncomment the first line of the function
-`ROnJobStdout()` in `R/vimrcom.vim` and delete the string "DEBUG:". It will
-become:
+To see messages received by the editor, uncomment the first line of the
+function `ROnJobStdout()` in `R/vimrcom.vim` (Vim) or in `R/nvimrcom.vim`
+(Neovim) and delete the string "DEBUG:". On Neovim, it will become:
 >vim
   call writefile(a:data, "/dev/shm/vimrserver_stdout", "a")
 <
 Then, in another terminal or in another Tmux pane, you can use tail to follow
-the output:
+the output (on Vim, the file is `/dev/shm/vimrserver_vim_stdout`):
 >
   tail -f /dev/shm/vimrserver_stdout
 <
@@ -764,7 +772,7 @@ defined by your colorscheme, but you can change them in your |vimrc| (see
 
 You can set both foreground and background colors of R output in your `vimrc`.
 The example below is for either a GUI version of Vim or a terminal interface
-of Vim with 'termguicolors' (see |true-color|):
+of Vim or Neovim with 'termguicolors' (see |true-color|):
 >vim
    if has('gui_running') || &termguicolors
      let rout_color_input    = 'guifg=#9e9e9e'
@@ -847,7 +855,19 @@ as expected again after any valid code is executed in the R Console.
 
 
 ------------------------------------------------------------------------------
-5.5. ~/.Rprofile should not output anything (Windows only)
+5.5. Error if there is no package installed (Neovim on Windows only)
+
+On Windows, Neovim fails to recognize that a directory is not writable, and
+this is required by Vim-R to detect whether it is necessary to create the
+directory defined by the `$R_LIBS_USER` environment variable. Consequently,
+Vim-R does not try to create the directory and the installation of vimcom
+fails. This happens if you have just installed or upgraded R. The workaround
+is to manually open R and install any package with the `install.packages()`
+command before using Vim-R.
+
+
+------------------------------------------------------------------------------
+5.6. ~/.Rprofile should not output anything (Windows only)
 
 The compilation of `vimcom` during R startup will fail on Windows if your
 `~/.Rprofile` outputs anything. Example of how to replicate the bug:
@@ -855,12 +875,24 @@ The compilation of `vimcom` during R startup will fail on Windows if your
    print("Hello bug!")
 <
 
+------------------------------------------------------------------------------
+5.7. You can't put `syntax enable` in your |vimrc| (OS X only)
+
+It seems that if you put the command `syntax enable` in your |vimrc| on OS X,
+file type plugins are sourced immediately. Consequently, some Vim-R variables
+(`R_disable_cmds` and `R_user_maps_only`) are used with their default values
+even if you have set them in the same file. The workaround is not to include
+the superfluous command `syntax enable`. For details, see:
+
+   https://github.com/jalvesaq/Vim-R/issues/668
+
+
 ==============================================================================
 6. Options                                                    *Vim-R-options*
 
 |R_auto_start|          Start R automatically
 |R_objbr_auto_start|    Start the Object Browser automatically
-|R-built-in-terminal|   Options to control Vim's built-in terminal
+|R-built-in-terminal|   Options to control the built-in terminal
 |R_external_term|       Command to run R in an external terminal emulator
 |R_silent_term|         Do not show terminal errors
 |R_set_home_env|        Set the value of $HOME for R (Windows only)
@@ -968,10 +1000,10 @@ See also: |R_after_ob_open|.
 
 
 ------------------------------------------------------------------------------
-6.2. R in Vim built-in terminal                   *R-built-in-terminal*
+6.2. R in the built-in terminal                   *R-built-in-terminal*
                                                                   *R_esc_term*
 
-By default, R runs in a Vim buffer created with the command |:term|,
+By default, R runs in an editor buffer created with the command |:term|,
 and the <Esc> key is mapped to leave Terminal mode and go to Normal mode.
 In Terminal mode, what you type is passed directly to R, while in Normal mode
 Vim's navigation commands work as usual (see |motion.txt|).
@@ -988,20 +1020,44 @@ Vim-R sets the option "editor" to a function that opens the object to be
 edited in a new tab when `R_esc_term` = 1 (the default value).
 
                                                                *R_close_term*
-The built-in terminal emulator running R is automatically closed when R quits.
-If you would rather that the terminal remains open after R quits, put in your
-|vimrc|:
+The built-in terminal emulator running R is automatically closed when R
+quits. Vim does this by itself; Neovim keeps the terminal open when the
+application running in it quits, and Vim-R closes it for you. If you would
+rather that the terminal remains open after R quits, put in your |vimrc|:
 >vim
    let R_close_term = 0
 <
+                                                               *R_auto_scroll*
+Neovim stops scrolling the R Console automatically if you move the cursor to
+any line that is not the last one. This emulates the behavior of other
+terminal emulators but, considering that (1) R only outputs something after
+we send a command to it, and (2) when we send a command to R we want to see
+its output, Vim-R moves the cursor to the last line of the R Console before
+sending a command, forcing the terminal to scroll. If you prefer to disable
+the auto scrolling, put in your |vimrc| (Neovim only):
+>vim
+   let R_auto_scroll = 0
+<
                                                                    *R_hl_term*
-The value of `R_hl_term` (0 or 1) determines whether Vim should syntax
-highlight the R output. Note, however, that Vim can highlight the terminal
-only while in Normal mode.
+The value of `R_hl_term` (0 or 1) determines whether the editor should syntax
+highlight the R output as if it were a .Rout file. Note that Vim can
+highlight the terminal only while in Normal mode.
+
+On Neovim, you may either use the package colorout (Unix only) to colorize
+the R output or let the editor highlight the terminal contents. Two
+advantages of colorout are the possibility of highlighting numbers close to
+zero in a different color and the distinction between stdout and stderr. On
+Neovim, the default value of `R_hl_term` is 0 if the package colorout is
+loaded. If you prefer not to rely on the auto detection of colorout, set the
+value of `R_hl_term` in your |vimrc|. Example:
+>vim
+   let R_hl_term = 0
+<
                                                                     *R_OutDec*
 Right after starting R, Vim-R will try to detect whether the value of R's
 `OutDec` option is `","` or the current R script sets the `OutDec` option, but
-you can also set it manually in your |vimrc|:
+you can also set it manually in your |vimrc|. This is useful if the editor is
+syntax highlighting the R output and is not recognizing the numbers correctly:
 >vim
    let R_OutDec = ','
 <
@@ -1041,7 +1097,7 @@ value:
 >vim
    let R_buffer_opts = "winfixwidth winfixheight nobuflisted"
 <
-If you do not want to run R in Vim's built-in terminal emulator, you have to
+If you do not want to run R in the built-in terminal emulator, you have to
 install Tmux >= 3.0, and then put in your |vimrc|:
 >vim
    let R_external_term = 1
@@ -1059,7 +1115,7 @@ to send commands from Vim to R.
 Note: The options of this section are ignored on Mac OS X, where the command
 `open` is called to run the default application used to run shell scripts.
 
-R will run in Vim's built-in terminal emulator, unless you set the value of
+R will run in the built-in terminal emulator, unless you set the value of
 `R_external_term`, which can be a numeric value (either `0` or `1`), the name
 of the terminal emulator or the complete command to run the terminal emulator.
 On Windows, the only valid value is `1`, which will make Vim-R run
@@ -1169,7 +1225,7 @@ cursor is not at the beginning of the line.
 While editing R code, `_` is replaced with `<-`. If you want to bind other
 keys to be replaced by `<-`, set the value of |R_assign_map| in your
 |vimrc|, as in the example below, which emulates RStudio's behavior (may only
-work on GVim):
+work on GVim or Neovim):
 >vim
    let R_assign_map = '<M-->'
 <
@@ -1452,11 +1508,20 @@ Notes:
   - If you have too many loaded packages, Vim may be unable to load the list
     of functions for syntax highlighting.
 
+  - Vim-R does not control the syntax highlighting of functions when
+    `nvim-treesitter` is enabled to highlight code on Neovim.
+
 By default, functions from `.GlobalEnv` and other environments in the
 `search()` path whose names do not start with `"package:"` are immediately
 highlighted after being created in the R workspace if `R_set_omnifunc` is not
 empty, or the Object Browser is open.
 
+Functions from environments in the search path are highlighted as functions
+from packages, but on Neovim (not on Vim) you can set a different highlight
+command for them in your |vimrc|, as in the example below:
+>vim
+   hi rGlobEnvFun ctermfg=117 guifg=#87d7ff cterm=italic gui=italic
+<
 If you prefer to completely disable the syntax highlighting of R functions by
 Vim-R, put in your |vimrc|:
 >vim
@@ -1910,13 +1975,20 @@ R code, but only if they begin with the substring "tab:".
 If the reference includes the field "file", you can open this file by typing
 <LocalLeader>od in Normal mode with the cursor over the citation key.
 
-Vim-R will do omni completion of bibliographic citation keys from `.bib`
-files, requiring Python 3 and the PyBTeX library for Python 3 to work. Then,
-Vim-R will look for bibliographic data in any `.bib` file listed in the
-`bibliography` field of the YAML header. If the `bibliography` field is not
-defined, it will use as bibliography sources all `.bib` files that are in the
-same directory as the RMarkdown document. The list of `.bib` files is
-updated whenever the buffer is saved.
+Rmarkdown and Quarto:
+
+On Neovim, it is recommended to install zotcite for completing citation keys
+of either RMarkdown or Quarto documents directly from the Zotero database:
+
+   https://github.com/jalvesaq/zotcite
+
+If zotcite is not installed, Vim-R will do omni completion of bibliographic
+citation keys from `.bib` files, requiring Python 3 and the PyBTeX library for
+Python 3 to work. Then, Vim-R will look for bibliographic data in any `.bib`
+file listed in the `bibliography` field of the YAML header. If the
+`bibliography` field is not defined, it will use as bibliography sources all
+`.bib` files that are in the same directory as the RMarkdown document. The
+list of `.bib` files is updated whenever the buffer is saved.
 
 If the reference includes the field "file", you can open this file by typing
 <LocalLeader>od in Normal mode with the cursor over the citation key.
@@ -2199,8 +2271,14 @@ file types if you include them in the list `R_bib_compl`. Example:
    let R_bib_compl = ['rnoweb', 'rmd', 'quarto']
 <
 However, there are alternative plugins for completing bib keys that work
-better than Vim-R, such as `VimTeX` (for Rnoweb,
-https://github.com/lervag/vimtex/).
+better than Vim-R. Examples:
+
+   - `VimTeX` (for Rnoweb):
+     https://github.com/lervag/vimtex/
+
+   - `zotcite` (for Markdown, Rmd and Quarto; Neovim only), which completes
+     citation keys directly from the Zotero database:
+     https://github.com/jalvesaq/zotcite
 
 
 ------------------------------------------------------------------------------
@@ -2247,7 +2325,7 @@ Calc:
    let R_csv_app = 'localc'
    let R_csv_app = 'c:/Program Files (x86)/LibreOffice 4/program/scalc.exe'
 <
-On Windows, `R_csv_app` works only in GVim.
+On Windows, `R_csv_app` works only in GVim, not in Neovim.
 
 If the default field delimiter causes problems in your case, you can change it
 in your |vimrc|. Valid values are `"\t"`, `";"` and `","`. Example:
@@ -2502,7 +2580,10 @@ See also: |R_source|.
 1.0.0 (2026-09-13)
 
  * Rename Nvim-R as Vim-R, and nvimcom as vimcom.
- * Remove support for Neovim.
+ * Support both Vim and Neovim again: the code removed in #829 was restored,
+   and the rename bug that made Neovim source the Vim job layer (and fail
+   with "E117: Unknown function: job_start") was fixed.
+ * Remove the integration with cmp-nvim-r/cmp-vim-r.
  * vimcom: replace the non-API entry points Rf_findVar() and R_SrcfileSymbol
    with the documented R_getVarEx(), R_GetBindingType(), R_GetCurrentSrcref()
    and R_GetSrcFilename(), and drop ENABLE_LEGACY_NONAPI_FUNS. R >= 4.6.0

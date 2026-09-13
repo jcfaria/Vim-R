@@ -1,7 +1,3 @@
-if has("nvim")
-    finish
-endif
-
 "==============================================================================
 " Support for rGlobEnvFun
 "==============================================================================
@@ -85,6 +81,19 @@ function FunHiOtherBf()
     endif
 
     " Syntax highlight other buffers
-    silent exe 'set syntax=' . &syntax
-    redraw
+    if has("nvim")
+        for bId in nvim_list_bufs()
+            let bsyn = nvim_buf_get_option(bId, "syntax")
+            if bsyn == 'r' || bsyn == 'quarto' || bsyn == 'rhelp' || bsyn == 'rmd' || bsyn == 'rnoweb' || bsyn == 'rrst'
+                if has("nvim-0.8.0")
+                    call nvim_set_option_value("syntax", bsyn, {'buf': bId})
+                else
+                    call nvim_buf_set_option(bId, "syntax", bsyn)
+                endif
+            endif
+        endfor
+    else
+        silent exe 'set syntax=' . &syntax
+        redraw
+    endif
 endfunction

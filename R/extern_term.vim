@@ -48,6 +48,10 @@ function StartR_ExternalTerm(rcmd)
                 \ ' VIMR_PORT=' . g:rplugin.myport .
                 \ ' R_DEFAULT_PACKAGES=' . $R_DEFAULT_PACKAGES
 
+    if $NVIM_IP_ADDRESS != ""
+        let rcmd .= ' NVIM_IP_ADDRESS='. $NVIM_IP_ADDRESS
+    endif
+
     let rcmd .= ' ' . a:rcmd
 
 
@@ -87,8 +91,13 @@ function StartR_ExternalTerm(rcmd)
         let initterm = ['cd "' . getcwd() . '"',
                     \ opencmd ]
         call writefile(initterm, g:rplugin.tmpdir . "/initterm_" . $VIMR_ID . ".sh")
-        let g:rplugin.jobs["Terminal emulator"] = StartJob(["sh", g:rplugin.tmpdir . "/initterm_" . $VIMR_ID . ".sh"],
-                    \ {'err_cb': 'ROnJobStderr', 'exit_cb': 'ROnJobExit'})
+        if has("nvim")
+            let g:rplugin.jobs["Terminal emulator"] = StartJob(["sh", g:rplugin.tmpdir . "/initterm_" . $VIMR_ID . ".sh"],
+                        \ {'on_stderr': function('ROnJobStderr'), 'on_exit': function('ROnJobExit'), 'detach': 1})
+        else
+            let g:rplugin.jobs["Terminal emulator"] = StartJob(["sh", g:rplugin.tmpdir . "/initterm_" . $VIMR_ID . ".sh"],
+                        \ {'err_cb': 'ROnJobStderr', 'exit_cb': 'ROnJobExit'})
+        endif
         call AddForDeletion(g:rplugin.tmpdir . "/initterm_" . $VIMR_ID . ".sh")
     endif
     let g:rplugin.debug_info['R open command'] = opencmd
