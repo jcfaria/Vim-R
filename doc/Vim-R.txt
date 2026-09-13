@@ -136,7 +136,7 @@ Additional dependencies for editing Rnoweb documents:
 
 Suggestions for Unix (Linux, OS X, Cygwin, etc.):
 
-   Tmux >= 3.0:  http://tmux.sourceforge.net
+   Tmux >= 3.0:  https://github.com/tmux/tmux
                  Tmux is required only if you want to run R in an external
                  terminal emulator (see |R_external_term|).
 
