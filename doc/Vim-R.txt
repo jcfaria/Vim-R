@@ -920,6 +920,7 @@ the superfluous command `syntax enable`. For details, see:
 |Rout_more_colors|      More syntax highlighting in R output
 |R_hi_fun|              Highlight R functions
 |R_hi_fun_paren|        Highlight R functions only if followed by a `(`
+|R-note-comments|       Highlight the note comments `#.`, `#..` and `#...`
 |R_routnotab|           Show output of R CMD BATCH in new window
 |R_notmuxconf|          Don't use a specially built Tmux config file
 |R_rconsole_height|     Number of lines of R Console
@@ -1527,6 +1528,28 @@ Vim-R, put in your |vimrc|:
 >vim
    let R_hi_fun = 0
 <
+                                                             *R-note-comments*
+Besides the usual highlighting of comments, Vim-R highlights three levels of
+"note" comments in R code:
+
+  - `#.` is a note of level 1, highlighted as `rNote1`;
+
+  - `#..` is a note of level 2, highlighted as `rNote2`;
+
+  - `#...` is a note of level 3, highlighted as `rNote3`.
+
+The whole comment is highlighted, the marker included, and four or more dots
+are still a note of level 3. The three groups are linked by default to
+`SpecialComment`, `Statement` and `Error`, so that they follow your
+colorscheme, but you can define your own highlighting in your |vimrc|, as in
+the example below:
+>vim
+   hi rNote1 ctermfg=245 guifg=#8a8a8a
+   hi rNote2 ctermfg=214 guifg=#ffaf00 cterm=bold gui=bold
+   hi rNote3 ctermfg=231 ctermbg=160 guifg=#ffffff guibg=#d70000
+<
+The notes are also highlighted in the R code chunks of Rnoweb, R Markdown and
+Quarto documents.
 
 ------------------------------------------------------------------------------
 6.11. How to automatically open the .Rout file                   *R_routnotab*
@@ -2615,6 +2638,11 @@ See also: |R_source|.
    plain file, and R_quarto_intel now accepts a path starting with "~". A
    warning is issued if the file cannot be read, instead of silently
    offering no completion at all.
+ * Highlight three levels of note comments in R code: `#.` is a note of level
+   1, `#..` of level 2, and `#...` (or more dots) of level 3. The whole
+   comment is highlighted, and the new highlight groups rNote1, rNote2 and
+   rNote3 are linked to standard groups, so that they follow the colorscheme
+   and can be redefined in the |vimrc|. See |R-note-comments|.
 
 0.9.21 (2025-04-15)
 
