@@ -81,6 +81,15 @@ function s:Cterm2Hex(n)
     return printf('#%02x%02x%02x', v, v, v)
 endfunction
 
+" Nearest entry of the palette by a distance weighted with the sensitivity of
+" the eye to each channel. That is not the same as keeping the hue, and it does
+" not keep it: the navy #003460 comes out as 23 (#005f5f, teal), because the
+" green channel weighs more than the blue one. Keeping the hue would mean
+" comparing hues, weighted by the saturation of the target, so that a pale
+" color is not dragged onto a saturated entry of the cube. Only RNoteHlApply()
+" calls this, and only for a base group that has a gui color and no ctermfg at
+" all, which none of the colorschemes the smoke test covers produces.
+"
 " The search is restricted to 16-255 because the terminal emulator may
 " redefine the first sixteen entries of the palette.
 function s:Hex2Cterm(hex)
@@ -118,9 +127,9 @@ function s:Hex2Gray(hex)
 endfunction
 
 " Move a palette index along the axes of the 6x6x6 cube, or along the grayscale
-" ramp, which is the only way of keeping the hue: looking for the nearest RGB
-" turns the navy #003460 of peachpuff into 23 (#005f5f, teal). f > 0 lightens,
-" f < 0 darkens.
+" ramp: walking the palette from the index the colorscheme chose is what keeps
+" the hue of that index, which a search for the nearest RGB would not (see
+" s:Hex2Cterm). f > 0 lightens, f < 0 darkens.
 function s:CtermShift(idx, f)
     let n = a:idx + 0
     if n < 0
