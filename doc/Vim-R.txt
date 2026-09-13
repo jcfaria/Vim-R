@@ -930,6 +930,9 @@ the superfluous command `syntax enable`. For details, see:
 |R_note_hl_amount|, |R_note_hl_amount3|  How much a note differs from a comment
 |Vim-R-notes|           Navigation and outline of the note comments
 |R_note_sections|       Recognize the section markers of RStudio
+|R_note_folding|        Fold an R script by the levels of its notes
+|R_note_foldtext|       Show the title of a note on the closed fold
+|R_note_foldlevel|      Level down to which a script is folded when opened
 |R_routnotab|           Show output of R CMD BATCH in new window
 |R_notmuxconf|          Don't use a specially built Tmux config file
 |R_rconsole_height|     Number of lines of R Console
@@ -2481,7 +2484,7 @@ Example:
 <
 
 ------------------------------------------------------------------------------
-6.40. Navigation and outline of the note comments                *Vim-R-notes*
+6.40. Navigation, outline and folding of the note comments       *Vim-R-notes*
                                                              *R_note_sections*
 
 The note comments described in |R-note-comments| structure a script
@@ -2526,6 +2529,53 @@ dots is recognized, put in your |vimrc|:
 >vim
    let R_note_sections = 0
 <
+                                                              *R_note_folding*
+                                                             *R_note_foldtext*
+                                                            *R_note_foldlevel*
+
+Vim-R can also fold an R script by the levels of its notes. That is off by
+default; to turn it on, put in your |vimrc|:
+>vim
+   let R_note_folding = ['r']
+<
+The value is the list of file types in which the folds are created, and only
+`r` has any effect: in Rnoweb, R Markdown and Quarto documents Vim-R does not
+take 'foldmethod' at all, because the folds would follow the notes of the R
+code chunks and ignore the structure of the document.
+
+'foldmethod' is set only if it still is `manual`, which is its value in R
+buffers unless you changed it, so a global 'foldmethod' of yours, or folding
+done by `nvim-treesitter`, is left alone. Everything that is set is
+registered in |b:undo_ftplugin|.
+
+A fold begins on the title line, so `zM` closes every section and leaves the
+level 1 titles visible, `zR` opens everything, and `zm` and `zr` walk one
+level at a time. To open a script already folded down to a given level, put
+in your |vimrc|:
+>vim
+   let R_note_foldlevel = 1
+<
+The default value, -1, leaves 'foldlevel' alone.
+
+The text of a closed fold is the title, the marker included, followed by the
+number of lines:
+>
+   #. Section one  [8 lines]
+<
+Vim's own `foldtext()` drops the `#`, which looks like a defect. If you
+prefer it anyway, or a 'foldtext' of your own, put in your |vimrc|:
+>vim
+   let R_note_foldtext = 0
+<
+The folds are made with 'foldexpr' and not with syntax regions, which report
+the wrong level after an edit until `:syntax sync fromstart` is run, and
+break the folds of `{}` that Vim's own R syntax script creates. That script
+folds by syntax when `g:r_syntax_folding` is set, which is mutually exclusive
+with `R_note_folding`: if `g:r_syntax_folding` exists, Vim-R does not fold by
+note levels, and warns once. Note that Vim's script tests only whether
+`g:r_syntax_folding` exists in one place and its value in another, so even a
+value of 0 creates fold regions.
+
 
 ==============================================================================
 7. Custom key bindings                                   *Vim-R-key-bindings*
@@ -2769,6 +2819,11 @@ See also: |R_source|.
    new option R_note_sections makes a comment ending in four or more "-", "="
    or "#" characters, which is the convention of RStudio, a title of level 1
    as well. See |Vim-R-notes|.
+ * Fold an R script by the levels of its note comments, with the title of
+   the section, the marker included, and the number of lines on the closed
+   fold. The folds are made with 'foldexpr', which gives the right level
+   immediately after an edit, and are off by default. New options:
+   R_note_folding, R_note_foldtext and R_note_foldlevel. See |Vim-R-notes|.
  * Fix bibliographic completion with R_python3: the check tested the literal
    string "g:R_python3" instead of the value of the option, so any
    interpreter set in R_python3 was rejected as "not found" and completion

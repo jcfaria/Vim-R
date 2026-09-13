@@ -89,3 +89,59 @@ function RNoteOutline()
 endfunction
 
 command RNoteOutline :call RNoteOutline()
+
+"==============================================================================
+" Folding by level
+"==============================================================================
+
+" The fold begins on the title line, which is what lets 'foldtext' show the
+" title. Syntax regions would be cheaper, but the runtime's "syn sync
+" minlines=40" makes them report the wrong level after an edit until
+" ":syntax sync fromstart" runs, and a marker inside a block breaks the folds
+" of {} that the runtime creates.
+function RNoteFoldExpr(lnum)
+    let lv = RNoteLevel(getline(a:lnum))
+    return lv > 0 ? '>' . lv : '='
+endfunction
+
+" The default foldtext() drops the '#', which looks like a defect in a lecture
+function RNoteFoldText()
+    return substitute(getline(v:foldstart), '\s*$', '', '')
+                \ . '  [' . (v:foldend - v:foldstart + 1) . ' lines]'
+endfunction
+
+" 'foldmethod' is seized only if it is still 'manual', which leaves alone a
+" user who has a global 'foldmethod' or who folds with treesitter.
+function RNoteSetFolding()
+    if index(g:R_note_folding, &filetype) == -1
+        return
+    endif
+    if exists("g:r_syntax_folding")
+        if !exists("s:said_syntax_folding")
+            let s:said_syntax_folding = 1
+            call RWarningMsg('R_note_folding is ignored because '
+                        \ . 'g:r_syntax_folding is set. The two are mutually '
+                        \ . 'exclusive. Please see Vim-R documentation.')
+        endif
+        return
+    endif
+    if &l:foldmethod !=# 'manual'
+        return
+    endif
+    setlocal foldmethod=expr
+    setlocal foldexpr=RNoteFoldExpr(v:lnum)
+    let undo = 'setlocal foldmethod< foldexpr<'
+    if g:R_note_foldtext
+        setlocal foldtext=RNoteFoldText()
+        let undo .= ' foldtext<'
+    endif
+    if g:R_note_foldlevel >= 0
+        let &l:foldlevel = g:R_note_foldlevel
+        let undo .= ' foldlevel<'
+    endif
+    if exists("b:undo_ftplugin")
+        let b:undo_ftplugin .= " | " . undo
+    else
+        let b:undo_ftplugin = undo
+    endif
+endfunction

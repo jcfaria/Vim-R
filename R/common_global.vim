@@ -908,6 +908,13 @@ let g:R_note_hl_base      = get(g:, "R_note_hl_base", "Comment")
 let g:R_note_hl_amount    = get(g:, "R_note_hl_amount",  0.45)
 let g:R_note_hl_amount3   = get(g:, "R_note_hl_amount3", 0.18)
 let g:R_note_sections     = get(g:, "R_note_sections",      1)
+let g:R_note_folding      = get(g:, "R_note_folding",      [])
+let g:R_note_foldtext     = get(g:, "R_note_foldtext",      1)
+let g:R_note_foldlevel    = get(g:, "R_note_foldlevel",    -1)
+
+if type(g:R_note_folding) == v:t_string
+    let g:R_note_folding = [g:R_note_folding]
+endif
 let g:R_bib_compl         = get(g:, "R_bib_compl", ["rnoweb"])
 
 if type(g:R_bib_compl) == v:t_string

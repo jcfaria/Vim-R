@@ -10,7 +10,8 @@
 #   3. sends the test script to R (<LocalLeader>aa),
 #   4. opens the Object Browser (<LocalLeader>ro),
 #   5. asserts on the *contents* of the R Console buffer and of the
-#      Object_Browser buffer, and on the highlighting of the note comments,
+#      Object_Browser buffer, and on the highlighting, the navigation, the
+#      outline and the folding of the note comments,
 #   6. weaves an Rnw file (<LocalLeader>kp), renders an Rmd file and renders a
 #      qmd file, and asserts on the command the plugin sent to R, on the file
 #      that R produced and, for the Rnw file, on the arguments with which
@@ -326,6 +327,11 @@ printf '  %-22s %s\n' "R_quarto_intel:" \
 # The level of every line of smoke.R: three lines of code, then the notes,
 # with the RStudio section of line 14 as a sibling of the level 1 notes.
 SMOKE_NOTE_LEVELS='00010203020101030'
+
+# The fold level of every line of smoke.R, which is the level of the deepest
+# note above it: a fold begins on the title line and ends before the next
+# title of the same or of a lesser level.
+SMOKE_NOTE_FOLDLEVELS='00011223322111133'
 
 # Written into a per-editor directory, so that a file produced by the first
 # editor can never be mistaken for a file produced by the second.
@@ -681,6 +687,27 @@ call writefile(['lnums ' . join(map(getloclist(0), 'v:val.lnum'), ' '),
 close
 EOF
 
+# Note comments: that 'foldmethod' is untouched until the option is set, the
+# fold level of every line, and the text of the closed folds. The option is
+# put back to its default so that no later assertion runs in a folded buffer.
+cat > "$WORK/act_notefold.vim" <<EOF
+call SmokeGoToEditorWin()
+edit! smoke.R
+let s:l = ['default ' . &l:foldmethod]
+let g:R_note_folding = ['r']
+edit! smoke.R
+call add(s:l, printf('set %s %s %s', &l:foldmethod, &l:foldexpr, &l:foldtext))
+call add(s:l, 'levels ' . join(map(range(1, line('\$')),
+            \\ 'foldlevel(v:val)'), ''))
+for s:ln in [4, 6, 14, 16]
+    call add(s:l, printf('text %d %s', s:ln, foldtextresult(s:ln)))
+endfor
+let g:R_note_folding = []
+edit! smoke.R
+call add(s:l, 'restored ' . &l:foldmethod)
+call writefile(s:l, '$OUT/note_fold.txt')
+EOF
+
 cat > "$WORK/act_quit.vim" <<EOF
 if exists('*RQuit')
     call RQuit('nosave')
@@ -1008,6 +1035,25 @@ run_note_checks() { # run_note_checks <name>
         else
             fail "$name: the note outline has no line '$want'"
             info "recorded: $(tr '\n' '/' < "$OUT/note_outline.txt" 2>/dev/null)"
+        fi
+    done
+
+    act notefold
+    sleep 1
+
+    for want in 'default manual' \
+                'set expr RNoteFoldExpr(v:lnum) RNoteFoldText()' \
+                "levels $SMOKE_NOTE_FOLDLEVELS" \
+                'text 4 #. Section one  [8 lines]' \
+                'text 6 #.. Subsection 1.1  [6 lines]' \
+                'text 14 # Section three ----  [4 lines]' \
+                'text 16 #.... Four dots are still a note of level 3  [2 lines]' \
+                'restored manual'; do
+        if file_has note_fold.txt "$want"; then
+            pass "$name: note folding: $want"
+        else
+            fail "$name: note folding is not '$want'"
+            info "recorded: $(tr '\n' '/' < "$OUT/note_fold.txt" 2>/dev/null)"
         fi
     done
 }
