@@ -19,16 +19,40 @@ if exists('g:R_path')
     unlet s:rpath
     unlet s:dir
 else
-    if isdirectory($RTOOLS40_HOME . '\usr\bin')
-        let $PATH = $RTOOLS40_HOME . '\usr\bin;' . $PATH
-    elseif isdirectory('C:\rtools40\usr\bin')
-        let $PATH = 'C:\rtools40\usr\bin;' . $PATH
-    endif
-    if isdirectory($RTOOLS40_HOME . '\mingw64\bin\')
-        let $PATH = $RTOOLS40_HOME . '\mingw64\bin;' . $PATH
-    elseif isdirectory('C:\rtools40\mingw64\bin')
-        let $PATH = 'C:\rtools40\mingw64\bin;' . $PATH
-    endif
+    " R installed by its own installer puts the bin directories of Rtools in
+    " the PATH by itself, reading RTOOLS<version>_HOME and falling back to
+    " the default installation directory. The code below does the same for
+    " the cases in which R does not do it, and looks for whatever Rtools is
+    " installed instead of naming one version, which is what made this code
+    " dead when Rtools40 was superseded.
+    let s:rtools = []
+    let s:env = environ()
+    for s:k in keys(s:env)
+        if s:k =~? '^RTOOLS\d\+\%(_AARCH64\)\=_HOME$' && s:env[s:k] != ''
+            let s:rtools += [[str2nr(matchstr(s:k, '\d\+')),
+                        \ substitute(s:env[s:k], '[\\/]\+$', '', '')]]
+        endif
+    endfor
+    for s:d in glob('C:\rtools*', 1, 1)
+        let s:rtools += [[str2nr(matchstr(s:d, '\c\<rtools\zs\d\+')), s:d]]
+    endfor
+    " Newest Rtools first and, for the same version, the environment
+    " variable before the default directory
+    call sort(s:rtools, {x, y -> y[0] - x[0]})
+    for [s:nr, s:rtdir] in s:rtools
+        if isdirectory(s:rtdir . '\usr\bin')
+            " The directory of the compilers is named after the CPU since
+            " Rtools42 and was mingw64 in Rtools40
+            let s:tc = glob(s:rtdir . '\*-w64-mingw32.static.posix\bin', 1, 1)
+                        \ + glob(s:rtdir . '\mingw64\bin', 1, 1)
+            let $PATH = s:rtdir . '\usr\bin;' . $PATH
+            if len(s:tc)
+                let $PATH = s:tc[0] . ';' . $PATH
+            endif
+            break
+        endif
+    endfor
+    unlet! s:rtools s:env s:k s:d s:nr s:rtdir s:tc
 
     let s:reg_roots = ["HKLM", "HKCU"]
     for s:rr in s:reg_roots

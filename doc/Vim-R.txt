@@ -2863,6 +2863,16 @@ See also: |R_source|.
    versions it serves, and is told to install the one matching their R, so
    that the advice cannot expire with the next release of R. See
    |Rtools-path|.
+ * Fix the search for Rtools on Windows, which named Rtools40 only and was
+   therefore dead for every R since 4.2: the `mingw64` directory that it
+   added to the `PATH` no longer exists, and the variable pointing to an
+   Rtools installed elsewhere is named after the version of Rtools, so
+   RTOOLS40_HOME says nothing about the toolchain of a current R. The
+   newest Rtools is looked for now in the versioned environment variables
+   and in `C:\rtools*`, and the name of the directory of the compilers,
+   which changes with the version of Rtools and with the CPU, is read from
+   the installation instead of being assumed. Nothing is added to the
+   `PATH` when no Rtools is found. See |Rtools-path|.
 
 0.9.21 (2025-04-15)
 
