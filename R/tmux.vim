@@ -22,6 +22,11 @@ else
 endif
 unlet s:tmuxversion
 
+" Newer Tmux versions sanitize control characters in paste-buffer with vis(3),
+" turning them into printable text (Ctrl-L becomes "^L"). The -S flag, when
+" available, disables the sanitizing.
+let g:rplugin.tmux_paste_flags = system("tmux list-commands paste-buffer") =~# '\[-[a-zA-Z]*S' ? ' -S' : ''
+
 let g:rplugin.tmuxsname = "VimR-" . substitute(localtime(), '.*\(...\)', '\1', '')
 
 let g:R_setwidth = get(g:, 'R_setwidth', 2)

@@ -2500,6 +2500,14 @@ See also: |R_source|.
  * Rename Nvim-R as Vim-R, and nvimcom as vimcom.
  * Remove support for Neovim.
 
+0.9.22 (2026-09-13)
+
+ * Fix \rr and \rm printing "^L" in the R Console instead of clearing it:
+   newer Tmux versions sanitize control characters when pasting, and now the
+   paste-buffer flag -S is used to disable the sanitizing, when available.
+ * Fix R_clear_line when R runs either in a Tmux pane or in an external
+   terminal emulator.
+
 0.9.21 (2025-04-15)
 
  * Bug fixes.

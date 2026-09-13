@@ -113,10 +113,12 @@ function SendCmdToR_Term(...)
     if str =~ '^-'
         let str = ' ' . str
     endif
+    let pcmd = " ; tmux -L VimR paste-buffer" . get(g:rplugin, "tmux_paste_flags", "") . " -t "
+                \ . g:rplugin.tmuxsname . '.' . TmuxOption("pane-base-index", "window")
     if a:0 == 2 && a:2 == 0
-        let scmd = "tmux -L VimR set-buffer '" . str . "' ; tmux -L VimR paste-buffer -t " . g:rplugin.tmuxsname . '.' . TmuxOption("pane-base-index", "window")
+        let scmd = "tmux -L VimR set-buffer '" . str . "'" . pcmd
     else
-        let scmd = "tmux -L VimR set-buffer '" . str . "\<CR>' ; tmux -L VimR paste-buffer -t " . g:rplugin.tmuxsname . '.' . TmuxOption("pane-base-index", "window")
+        let scmd = "tmux -L VimR set-buffer '" . str . "\<CR>'" . pcmd
     endif
     let rlog = system(scmd)
     if v:shell_error

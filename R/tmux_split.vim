@@ -98,10 +98,11 @@ function SendCmdToR_TmuxSplit(...)
     if str =~ '^-'
         let str = ' ' . str
     endif
+    let pcmd = " ; tmux paste-buffer" . get(g:rplugin, "tmux_paste_flags", "") . " -t " . g:rplugin.rconsole_pane
     if a:0 == 2 && a:2 == 0
-        let scmd = "tmux set-buffer '" . str . "' ; tmux paste-buffer -t " . g:rplugin.rconsole_pane
+        let scmd = "tmux set-buffer '" . str . "'" . pcmd
     else
-        let scmd = "tmux set-buffer '" . str . "\<CR>' ; tmux paste-buffer -t " . g:rplugin.rconsole_pane
+        let scmd = "tmux set-buffer '" . str . "\<CR>'" . pcmd
     endif
     let rlog = system(scmd)
     if v:shell_error
