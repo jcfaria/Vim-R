@@ -116,7 +116,9 @@ Main dependencies:
        |vimcom-not-loaded|).
 
      - On Windows, you have to install Rtools to be able to build the
-       package: https://cran.r-project.org/bin/windows/Rtools/
+       package. Each Rtools serves a specific range of R versions, and the
+       page below tells which one matches the R that you have installed:
+       https://cran.r-project.org/bin/windows/Rtools/
 
 
 Additional dependencies for editing Rnoweb documents:
@@ -1182,11 +1184,19 @@ put in your |vimrc|:
                                                            *R_set_home_env*
                                                            *Rtools-path*
 
-If R cannot find either `make` or `gcc` while trying to compile vimcom, you
-should add their directories to the beginning of the `PATH` environment
-variable in your |vimrc|:
+If R cannot find either `make` or `gcc` while trying to compile vimcom, the
+Rtools that you have installed probably does not match your version of R.
+Each Rtools serves a specific range of R versions, and the page below tells
+which one you need:
+
+   https://cran.r-project.org/bin/windows/Rtools/
+
+Rtools installed in its default directory is found by R itself, and nothing
+else has to be done. If you installed it somewhere else, add its `bin`
+directories, whose names depend on the Rtools version, to the beginning of
+the `PATH` environment variable in your |vimrc|:
 >vim
-   let $PATH = "C:\\rtools40\\mingw64\\bin;C:\\rtools40\\usr\\bin;" . $PATH
+   let $PATH = "C:\\path\\to\\Rtools\\usr\\bin;" . $PATH
 <
 By default, Vim-R will save the positions of R Console and Vim windows
 when you quit R with the <LocalLeader>rq command, and it will restore the
@@ -1429,9 +1439,10 @@ You can set the path to a different R version for specific R scripts in your
 The `R_path` variable can also be prefixed to the `PATH` environment variable.
 So, it can include more than one directory separated by a `;` on Windows or a
 `:` on other systems. This is especially important for including the paths to
-the Rtools `bin` directories on Windows. Example:
+the `bin` directories of Rtools on Windows, if Rtools is not installed in its
+default directory (see |Rtools-path|). Example:
 >vim
-   let R_path = 'C:\rtools40\mingw64\bin;C:\rtools40\usr\bin;C:\Program Files\R\R-4.0.1\bin\x64'
+   let R_path = 'C:\path\to\Rtools\usr\bin;C:\Program Files\R\R-4.0.1\bin\x64'
 <
 By default, `R_cmd` is `"R"` (but it might be the same as `R_app`) and will
 be used to run some scripts in the background, such as:
@@ -2843,6 +2854,15 @@ See also: |R_source|.
    option. The string is now looked for in the whole list. The deprecation
    warning about R_latexcmd not being a list tests the type of the option
    now, instead of the length of its first element. See |R_latexcmd|.
+ * Stop telling Windows users to install Rtools40, which serves only R 4.0.0
+   to 4.1.3: whoever followed the instruction on a newer R installed a
+   toolchain that R does not use, and the automatic build of vimcom then
+   failed because of the documentation itself. The examples also pointed at
+   `mingw64`, a directory that no longer exists since Rtools42. The reader
+   is now sent to CRAN's page of Rtools, which maps each Rtools to the R
+   versions it serves, and is told to install the one matching their R, so
+   that the advice cannot expire with the next release of R. See
+   |Rtools-path|.
 
 0.9.21 (2025-04-15)
 
