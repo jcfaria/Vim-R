@@ -2598,6 +2598,12 @@ See also: |R_source|.
    paste-buffer flag -S is used to disable the sanitizing, when available.
  * Fix R_clear_line when R runs either in a Tmux pane or in an external
    terminal emulator.
+ * Adopt four fixes from lucaparmigiani's fork: vimrserver no longer mistakes
+   the pak _cache/ directory for an installed package; a deleted R terminal
+   buffer is no longer reopened, which on Neovim 0.12 raised "E86"; \rf
+   recovers from a stale R terminal state instead of believing that R is
+   still running; and no spurious warning is issued when R is terminated by
+   closing its terminal buffer, on either editor.
 
 0.9.21 (2025-04-15)
 
