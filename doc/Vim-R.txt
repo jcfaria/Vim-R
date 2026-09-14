@@ -2353,9 +2353,13 @@ If the file can be read neither at the value of `R_quarto_intel` nor at the
 place where Vim-R looks for it, a warning is issued and completion of Quarto
 cell options is disabled.
 
-Omni completion in Rnoweb files will include results from bib file entries
-(requiring Python 3 and python3-pybtex): required for omni completion of
-citation keys (following |R_cite_pattern|) in Rnoweb documents.
+Omni completion of citation keys in Rnoweb documents (following
+|R_cite_pattern|) includes the entries of the bib files. It requires Python 3
+and the PyBTeX library, which is `pybtex` on PyPI, `python3-pybtex` on Debian
+and on Ubuntu, and `python3NN-pybtex` on openSUSE, where NN is the version of
+Python. Nothing is said when PyBTeX cannot be imported, since the library is
+optional: run `:RDebugInfo` and read the line "BibComplete", which is
+"PyBTex OK" only when completion of citation keys is working.
 
 Completion of bib file entries may also be enabled for `rmd` and `quarto`
 file types if you include them in the list `R_bib_compl`. Example:
@@ -2879,6 +2883,25 @@ See also: |R_source|.
    state the requirement agree now: the list of dependencies, vimcom's
    DESCRIPTION and the warning issued when R starts. See
    |Vim-R-installation|.
+ * Fix bibliographic completion with a PyBTeX that has no PyYAML: the parser
+   of the bib file was left for PyBTeX to choose by suffix, which loads a
+   `pkg_resources` entry point and, with it, validates every dependency
+   PyBTeX declares, PyYAML included, even though PyYAML is needed only by the
+   bibyaml parser that Vim-R never uses. Every parse then failed with
+   "DistributionNotFound" and completion of citation keys silently returned
+   nothing. The BibTeX parser, which is what the ".bib" suffix maps to, is
+   now named explicitly. See |R_bib_compl|.
+ * Fix a relative path in the `bibliography` field of the YAML header of an
+   Rmd or a qmd document: it was resolved against the working directory of
+   the editor instead of the directory of the document, which is how pandoc
+   and quarto read it, so completion of citation keys returned nothing
+   whenever the two directories differed. See |R_bib_compl|.
+ * Complete LaTeX commands, `\ref{}`, `\pageref{}` and `\begin{}` in Rnoweb
+   documents even when bibliographic completion is not available: the buffer
+   variable naming the completion function of non-R code was set by the
+   PyBTeX check, so a missing PyBTeX, or an R_bib_compl without "rnoweb",
+   disabled the completion of every kind of non-R code and not only of the
+   citation keys. The ftplugin sets it now. See |R_non_r_compl|.
 
 0.9.21 (2025-04-15)
 

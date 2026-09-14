@@ -31,6 +31,16 @@ function RCompleteBib(base)
     return resp
 endfunction
 
+" Pandoc and Quarto read a relative path of the YAML header as relative to the
+" document. bibtex.py would resolve it against its own working directory, which
+" is the one the editor had when the job started.
+function! s:AbsBibPath(fname)
+    if a:fname =~ '^\(/\|\a:[\\/]\)'
+        return a:fname
+    endif
+    return expand('%:p:h') . '/' . a:fname
+endfunction
+
 function! s:GetBibFileName()
     if !exists('b:rplugin_bibf')
         let b:rplugin_bibf = ''
@@ -39,6 +49,9 @@ function! s:GetBibFileName()
         let newbibf = RmdGetYamlField('bibliography')
         if newbibf == ''
             let newbibf = join(glob(expand("%:p:h") . '/*.bib', 0, 1), "\x06")
+        else
+            let newbibf = join(map(split(newbibf, "\x06"),
+                        \ 's:AbsBibPath(v:val)'), "\x06")
         endif
     else
         let newbibf = join(glob(expand("%:p:h") . '/*.bib', 0, 1), "\x06")
@@ -106,10 +119,6 @@ function CheckPyBTeX(...)
         call s:GetBibFileName()
         if !exists("b:rplugin_did_bib_autocmd")
             autocmd BufWritePost <buffer> call s:GetBibFileName()
-            if &filetype == 'rnoweb'
-                let b:rplugin_non_r_omnifunc = "RnwNonRCompletion"
-                autocmd CompleteDone <buffer> call RnwOnCompleteDone()
-            endif
         endif
         let b:rplugin_did_bib_autocmd = 1
     endif

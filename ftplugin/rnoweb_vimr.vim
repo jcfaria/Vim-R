@@ -148,7 +148,7 @@ function! RnwNonRCompletion(findstart, base)
         endif
 
         if newbase != '' && piece =~ s:cite_ptrn
-            return RCompleteBib(newbase)
+            return exists('*RCompleteBib') ? RCompleteBib(newbase) : []
         elseif piece == '\begin{'
             let s:compl_type = 9
             return s:CompleteEnv(newbase)
@@ -168,6 +168,15 @@ function! RnwOnCompleteDone()
         endif
     endif
 endfunction
+
+" Completion of LaTeX commands, of labels and of environments does not need
+" PyBTeX. Set here, and not by CheckPyBTeX(), so that it also happens when
+" bibliographic completion is unavailable or turned off.
+let b:rplugin_non_r_omnifunc = "RnwNonRCompletion"
+augroup RnwCompleteDone
+    autocmd! CompleteDone <buffer>
+    autocmd CompleteDone <buffer> call RnwOnCompleteDone()
+augroup END
 
 
 " Pointers to functions whose purposes are the same in rnoweb, rrst, rmd,

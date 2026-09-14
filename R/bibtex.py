@@ -3,6 +3,7 @@ import sys
 import os
 import re
 from pybtex.database import parse_file
+from pybtex.database.input.bibtex import Parser as BibTeXParser
 from vimr import vimr_cmd, vimr_warn
 
 class BibEntries:
@@ -48,7 +49,15 @@ class BibEntries:
         self.E[b] = {}
 
         try:
-            bib = parse_file(b)
+            # Asking pybtex to choose the parser by suffix makes it load a
+            # pkg_resources entry point, which validates every requirement
+            # pybtex declares, including the PyYAML that only its bibyaml
+            # parser needs. Naming the parser skips that: '.bib' is mapped to
+            # this very class.
+            if b.lower().endswith('.bib'):
+                bib = parse_file(b, bib_format=BibTeXParser)
+            else:
+                bib = parse_file(b)
         except Exception as ERR:
             vimr_warn('Error parsing ' + b + ': ' + str(ERR))
             return
