@@ -19,7 +19,11 @@
 #   7. asserts that Quarto chunk-option completion is populated from quarto's
 #      yaml-intelligence-resources.json, both when the plugin has to find that
 #      file by itself, starting from the quarto command on $PATH, and when it
-#      is handed the path through R_quarto_intel.
+#      is handed the path through R_quarto_intel,
+#   8. asserts the citation keys, the authors and the years that bibliographic
+#      completion returns for an Rmd, a qmd and an Rnw document, both through
+#      RCompleteBib() and through the omni completion function the user
+#      triggers.
 #
 # Steps 3-7 are the point of the test: they only succeed if the whole chain
 # vimcom -> vimrserver -> editor is alive. An editor that starts and does
@@ -56,7 +60,8 @@
 # Requirements: bash, tmux, R (with a C compiler), vim, nvim.
 # Optional, detected at run time: latexmk and xelatex (Rnw), pandoc and the
 # rmarkdown package (Rmd), the quarto command and the quarto package (qmd),
-# and quarto's editor/tools/yaml/yaml-intelligence-resources.json (completion).
+# quarto's editor/tools/yaml/yaml-intelligence-resources.json (completion), and
+# a Python 3 whose PyBTeX can parse a .bib file (bibliographic completion).
 #
 # Isolation guarantees (see also check_isolation below):
 #
@@ -173,6 +178,9 @@ export NVIM_LOG_FILE="$WORK/nvim.log"
 export TMPDIR="$WORK/tmp"
 export R_LIBS_USER="$R_LIB"
 export R_PROFILE_USER="$WORK/Rprofile"  # ignore the user's ~/.Rprofile
+# R/bibtex.py imports R/vimr.py, and byte-compiling it would write a
+# __pycache__ into the repository.
+export PYTHONDONTWRITEBYTECODE=1
 unset R_LIBS R_LIBS_SITE R_ENVIRON_USER 2>/dev/null || true
 
 # The only thing the scratch Rprofile does is make the user's libraries
@@ -280,6 +288,45 @@ find_quarto_intel() {
     return 1
 }
 
+# The interpreter Vim-R would resolve to with R_python3 unset: the first of
+# 'python3' and 'python' on $PATH that is Python 3, as s:HasPython3() picks it.
+find_bib_python() {
+    local py
+    for py in python3 python; do
+        command -v "$py" >/dev/null 2>&1 || continue
+        if "$py" --version 2>&1 | grep -q '^Python 3'; then
+            printf '%s' "$py"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Whether that interpreter can really deliver a completion, asked of R/bibtex.py
+# itself and not of an import: a PyBTeX that imports and then fails to parse --
+# one installed without the PyYAML it declares, for instance -- has to be
+# reported as missing instead of failing the assertions. Prints why it cannot.
+probe_pybtex() { # probe_pybtex <interpreter>
+    local py="$1" why
+    mkdir -p "$WORK/pybtex-probe"
+    printf '%s\n' '@book{smokeprobe, author = {Probe, P}, title = {T},' \
+                  '  year = {2000}}' > "$WORK/pybtex-probe/probe.bib"
+    rm -f "$WORK/pybtex-probe/bibcompl"
+    printf '\003\005%s\n' "$WORK/pybtex-probe/probe.qmd" |
+        VIMR_TMPDIR="$WORK/pybtex-probe" "$py" "$REPO/R/bibtex.py" \
+            "$WORK/pybtex-probe/probe.qmd" "$WORK/pybtex-probe/probe.bib" \
+            >/dev/null 2>"$WORK/pybtex-probe/err"
+    grep -q smokeprobe "$WORK/pybtex-probe/bibcompl" 2>/dev/null && return 0
+    # What bibtex.py says when PyBTeX is there and the parse fails, and
+    # otherwise the last line, which of a traceback is the exception itself.
+    why="$(grep -m1 'Error parsing' "$WORK/pybtex-probe/err" 2>/dev/null)"
+    [ -n "$why" ] || why="$(grep -v '^[[:space:]]*$' \
+        "$WORK/pybtex-probe/err" 2>/dev/null | tail -1)"
+    printf 'the PyBTeX library of %s cannot parse a .bib file: %s' \
+        "$py" "${why:-it returned no completion and said nothing}"
+    return 1
+}
+
 head1 "Optional toolchain"
 
 HAVE_RNW=1; WHY_RNW=""
@@ -314,6 +361,15 @@ if ! command -v quarto >/dev/null 2>&1; then
     HAVE_QCOMPL=0; WHY_QCOMPL="the 'quarto' command is not in \$PATH"
 fi
 
+HAVE_BIB=1; WHY_BIB=""; BIB_PY=""
+BIB_PY="$(find_bib_python || true)"
+if [ -z "$BIB_PY" ]; then
+    HAVE_BIB=0
+    WHY_BIB="neither 'python3' nor 'python' in \$PATH is Python 3"
+else
+    WHY_BIB="$(probe_pybtex "$BIB_PY")" || HAVE_BIB=0
+fi
+
 # Only for the R_quarto_intel assertion: the path the harness finds by itself,
 # with its own logic, so that the option is asserted against a known-good file
 # instead of against whatever the plugin happened to discover.
@@ -329,6 +385,8 @@ printf '  %-22s %s\n' "Quarto completion:" \
     "$([ "$HAVE_QCOMPL" -eq 1 ] && echo "auto-discovery from $(command -v quarto)" || echo "SKIP: $WHY_QCOMPL")"
 printf '  %-22s %s\n' "R_quarto_intel:" \
     "$([ -n "$QUARTO_INTEL" ] && echo "$QUARTO_INTEL" || echo "SKIP: the harness did not find yaml-intelligence-resources.json")"
+printf '  %-22s %s\n' "Bib completion:" \
+    "$([ "$HAVE_BIB" -eq 1 ] && echo "PyBTeX usable by $BIB_PY" || echo "SKIP: $WHY_BIB")"
 
 # ------------------------------------------------------------------ fixtures --
 
@@ -415,6 +473,55 @@ cat("VIMR_SMOKE_QMD_CHUNK:", 6 * 7, "\n")
 
 VIMRSMOKEQMDTEXT.
 EOF
+
+    # Bibliographic completion. The keys hold none of the authors and none of
+    # the words of the titles, so a match can only have come from the field the
+    # assertion says it came from.
+    cat > "$d/smoke_refs.bib" <<'EOF'
+@article{smokebibone2001,
+  author = {Alpha, Ana and Beta, Bruno},
+  title = {A study of alphabetic things},
+  year = {2001},
+  journal = {Journal of Alpha}
+}
+@book{smokebibtwo1998,
+  author = {Gamma, Gustavo},
+  title = {Delta and the art of gamma},
+  year = {1998},
+  publisher = {Delta Press}
+}
+EOF
+
+    # Never rendered: a 'bibliography:' would make pandoc and quarto run
+    # citeproc, and the assertions of step 6 are not about that. The path is
+    # relative, as it is written in practice, and is read as relative to the
+    # document. The Rnw file names no bib file: there, the plugin globs *.bib
+    # in the directory of the document.
+    cat > "$d/smoke_bib.Rmd" <<'EOF'
+---
+title: "Vim-R smoke test"
+bibliography: smoke_refs.bib
+---
+
+VIMRSMOKEBIBRMD.
+EOF
+
+    cat > "$d/smoke_bib.qmd" <<'EOF'
+---
+title: "Vim-R smoke test"
+bibliography: smoke_refs.bib
+---
+
+VIMRSMOKEBIBQMD.
+EOF
+
+    cat > "$d/smoke_bib.Rnw" <<'EOF'
+\documentclass{article}
+\begin{document}
+VIMRSMOKEBIBRNW.
+\bibliography{smoke_refs}
+\end{document}
+EOF
 }
 
 # The line the SyncTeX assertion jumps from. Taken from the fixture itself, so
@@ -444,6 +551,8 @@ let R_external_term = 0
 let R_wait = 60
 let R_openpdf = 0
 let R_openhtml = 0
+" Bibliographic completion is enabled for rnoweb alone by default.
+let R_bib_compl = ['rnoweb', 'rmd', 'quarto']
 
 " R_quarto_intel is deliberately left unset here: the completion assertion
 " exercises the plugin's own search for yaml-intelligence-resources.json. The
@@ -476,6 +585,7 @@ export NVIM_LOG_FILE='$NVIM_LOG_FILE'
 export TMPDIR='$TMPDIR'
 export R_LIBS_USER='$R_LIBS_USER'
 export R_PROFILE_USER='$R_PROFILE_USER'
+export PYTHONDONTWRITEBYTECODE='$PYTHONDONTWRITEBYTECODE'
 cd '$proj' || exit 1
 exec $* 'smoke.R'
 EOF
@@ -754,6 +864,46 @@ call add(s:l, 'restored ' . &l:foldmethod)
 call writefile(s:l, '$OUT/note_fold.txt')
 EOF
 
+# Bibliographic completion, for the three file types that can have it.
+#
+# CheckPyBTeX() is called explicitly, as FillQuartoComplMenu() is above, so that
+# the search for the bib file and the start of the BibComplete job do not depend
+# on the timer the ftplugin arms. Every base is asked for through
+# RCompleteBib(), which blocks until the job has answered, and one of them also
+# through CompleteR(), which is the 'omnifunc' the user triggers: the cursor is
+# put on the space that follows the half typed citation, which is where it would
+# be, so that the base CompleteR() is handed is the one Vim would hand it. The
+# buffer is reloaded on every pass, so the script is repeatable.
+cat > "$WORK/act_bib.vim" <<EOF
+call SmokeGoToEditorWin()
+for [s:f, s:tag] in [['smoke_bib.Rmd', 'rmd'], ['smoke_bib.qmd', 'quarto'],
+            \\ ['smoke_bib.Rnw', 'rnoweb']]
+    exe 'edit! ' . s:f
+    call CheckPyBTeX()
+    let s:l = ['ft ' . &filetype, 'bibf ' . b:rplugin_bibf]
+    for [s:btag, s:base] in [['all', ''], ['key', 'smokebibtwo'],
+                \\ ['author', 'gamma'], ['none', 'zzznomatch']]
+        let s:r = RCompleteBib(s:base)
+        call add(s:l, printf('%s n=%d %s', s:btag, len(s:r),
+                    \\ join(map(copy(s:r), 'v:val["word"]'), ' ')))
+        for s:it in s:r
+            call add(s:l, printf('item %s | %s | %s',
+                        \\ s:it['word'], s:it['abbr'], s:it['menu']))
+        endfor
+    endfor
+    let s:cite = (&filetype == 'rnoweb' ? 'A ' . nr2char(92) . 'cite{'
+                \\ : 'A [@') . 'smokebibtwo '
+    call append(line('\$'), s:cite)
+    call cursor(line('\$'), len(s:cite))
+    let s:st = CompleteR(1, '')
+    let s:r = CompleteR(0, strpart(getline('.'), s:st, col('.') - 1 - s:st))
+    call add(s:l, printf('omni n=%d %s', len(s:r),
+                \\ join(map(copy(s:r), 'v:val["word"]'), ' ')))
+    call writefile(s:l, '$OUT/bib_' . s:tag . '.txt')
+endfor
+edit! smoke.R
+EOF
+
 cat > "$WORK/act_quit.vim" <<EOF
 if exists('*RQuit')
     call RQuit('nosave')
@@ -874,6 +1024,26 @@ do_act() {
     tmux -L "$SOCK" capture-pane -p -t "$SESSION" > "$OUT/pane.txt" 2>/dev/null
     [ -f "$OUT/pane.txt" ] && sed -n '1,25p' "$OUT/pane.txt" | sed 's/^/      | /'
     return 1
+}
+
+# do_act_until <editor> <act-name> <predicate> <timeout-seconds>
+#
+# What an act_*.vim writes is complete as soon as its sentinel is there, but not
+# necessarily populated: RCompleteBib() waits for the BibComplete job itself,
+# and only for as long as it is willing to, so the first call can honestly come
+# back empty while the Python interpreter is still importing PyBTeX. Sourcing
+# the script again is what waits for that, and every pass is still synchronised
+# by its own sentinel, so the predicate is never evaluated against a file that
+# is being written. A sleep here would be a guess at how long an import takes.
+do_act_until() {
+    local name="$1" act="$2" predicate="$3" deadline=$((SECONDS + $4))
+    while :; do
+        do_act "$name" "$act" || return 1
+        if eval "$predicate" >/dev/null 2>&1; then
+            return 0
+        fi
+        [ "$SECONDS" -lt "$deadline" ] || return 1
+    done
 }
 
 # r_is_idle <editor> <tag> <timeout-seconds>
@@ -1231,6 +1401,58 @@ run_note_checks() { # run_note_checks <name>
     done
 }
 
+# ------------------------------------------- bibliographic completion checks --
+
+# Asserts the citation keys, the authors and the years that completion returns.
+# Nothing here goes through R: the bib entries come from the BibComplete job,
+# which is R/bibtex.py driven by the editor, so this is asserted before R is
+# started and a failure of R's cannot hide a failure of this.
+run_bib_checks() { # run_bib_checks <name> <proj-dir>
+    local name="$1" proj="$2"
+
+    if [ "$HAVE_BIB" -eq 0 ]; then
+        skip "$name: bibliographic completion in Rmd, Quarto and Rnoweb ($WHY_BIB)"
+        return
+    fi
+
+    if ! do_act_until "$name" bib \
+            "file_has bib_rmd.txt 'all n=2' &&
+             file_has bib_quarto.txt 'all n=2' &&
+             file_has bib_rnoweb.txt 'all n=2'" 60; then
+        fail "$name: the BibComplete job never returned the bib entries"
+        local t
+        for t in rmd quarto rnoweb; do
+            info "bib_$t: $(tr '\n' '/' < "$OUT/bib_$t.txt" 2>/dev/null)"
+        done
+        info "warning: $(grep -F 'BibComplete' "$OUT/messages.txt" 2>/dev/null | tail -1)"
+        return
+    fi
+
+    # The keys are ordered as the bib file orders them. 'key' matches the
+    # citation key, 'author' the last name of an author of the other entry, and
+    # 'omni' is the same match reached through 'omnifunc'. The bib file is
+    # asserted by its full path: a 'bibliography:' of a YAML header is written
+    # relative to the document.
+    local t want
+    for t in rmd quarto rnoweb; do
+        for want in "bibf $proj/smoke_refs.bib" \
+                    'all n=2 smokebibone2001 smokebibtwo1998' \
+                    'item smokebibone2001 | Alpha, Beta | (2001) A study of alphabetic things' \
+                    'item smokebibtwo1998 | Gamma | (1998) Delta and the art of gamma' \
+                    'key n=1 smokebibtwo1998' \
+                    'author n=1 smokebibtwo1998' \
+                    'none n=0' \
+                    'omni n=1 smokebibtwo1998'; do
+            if file_has "bib_$t.txt" "$want"; then
+                pass "$name: bib completion ($t): $want"
+            else
+                fail "$name: bib completion ($t) has no line '$want'"
+                info "recorded: $(tr '\n' '/' < "$OUT/bib_$t.txt" 2>/dev/null)"
+            fi
+        done
+    done
+}
+
 # --------------------------------------------------------------- editor run --
 
 run_editor() { # run_editor <name> <editor-command...>
@@ -1259,6 +1481,7 @@ run_editor() { # run_editor <name> <editor-command...>
 
     # Nothing below depends on R, so it is asserted before R is started.
     run_note_checks "$name"
+    run_bib_checks "$name" "$proj"
 
     # Once a step fails there is no point in waiting out the timeout of every
     # step that depends on it: report them as failures right away.
