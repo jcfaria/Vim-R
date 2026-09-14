@@ -2902,6 +2902,12 @@ See also: |R_source|.
    PyBTeX check, so a missing PyBTeX, or an R_bib_compl without "rnoweb",
    disabled the completion of every kind of non-R code and not only of the
    citation keys. The ftplugin sets it now. See |R_non_r_compl|.
+ * Fix SyncTeX forward search in the second and in every later Rnoweb buffer
+   of a session, which raised "E121: Undefined variable: b:rplugin_pdfdir":
+   the directory of the pdf was computed by pdf_init.vim, which runs once per
+   session and for whichever buffer happens to be current then, so opening an
+   Rmd document, or a second Rnoweb one, before searching left it undefined.
+   Every Rnoweb buffer computes its own now. See |Vim-R-SyncTeX|.
 
 0.9.21 (2025-04-15)
 

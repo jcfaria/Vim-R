@@ -237,6 +237,11 @@ endfunction
 
 call timer_start(1, "RPDFinit")
 
+" pdf_init.vim returns at once every time after the first, so the SetPDFdir() it
+" calls only ever reached the buffer that was current then. SyncTeX forward
+" search reads b:rplugin_pdfdir, and every Rnoweb buffer needs its own.
+call SetPDFdir()
+
 if exists("b:undo_ftplugin")
     let b:undo_ftplugin .= " | unlet! b:IsInRCode b:PreviousRChunk b:NextRChunk b:SendChunkToR"
 else
