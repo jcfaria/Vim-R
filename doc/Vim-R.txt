@@ -99,7 +99,7 @@ Main dependencies:
       Note: If R.nvim is also installed, Vim-R does nothing on Neovim, and
       you should read R.nvim's own documentation instead.
 
-   R >= 4.1.0:
+   R >= 4.0.0:
       http://www.r-project.org/
 
    Notes about the R package `vimcom`:
@@ -2873,6 +2873,12 @@ See also: |R_source|.
    which changes with the version of Rtools and with the CPU, is read from
    the installation instead of being assumed. Nothing is added to the
    `PATH` when no Rtools is found. See |Rtools-path|.
+ * Ask for R >= 4.0.0 in the list of dependencies, and not R >= 4.1.0: the
+   documentation required a newer R than the plugin needs, since nothing in
+   Vim-R nor in vimcom uses anything added by R 4.1. The three places that
+   state the requirement agree now: the list of dependencies, vimcom's
+   DESCRIPTION and the warning issued when R starts. See
+   |Vim-R-installation|.
 
 0.9.21 (2025-04-15)
 
