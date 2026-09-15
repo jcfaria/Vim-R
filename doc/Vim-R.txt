@@ -2927,7 +2927,8 @@ See also: |R_source|.
  * Keep the Object Browser updating when an S4 object has a slot that is
    not set: ggplot2 4 is the everyday case. The listing used to abort
    inside R's idle task, so objects created afterwards never appeared
-   and nothing was shown to the user. Absent slots are now skipped.
+   and nothing was shown to the user. Absent slots are now skipped, and
+   the slot count shown next to the object now matches what is listed.
  * Print an object with several S3 classes, and a name of the form
    pkg::fun, with <LocalLeader>rp: under R 4.6 the former raised
    "first argument has length > 1" (any tibble triggers it) and the

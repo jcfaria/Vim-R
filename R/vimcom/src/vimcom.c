@@ -567,21 +567,30 @@ static char *vimcom_glbnv_line(SEXP *x, const char *xname, const char *curenv,
         PROTECT(cmdSexp = allocVector(STRSXP, 1));
         SET_STRING_ELT(cmdSexp, 0, mkChar(buf));
         PROTECT(cmdexpr = R_ParseVector(cmdSexp, -1, &status, R_NilValue));
+        int nset = 0;
         if (status == PARSE_OK) {
             int er = 0;
             PROTECT(sn = R_tryEval(VECTOR_ELT(cmdexpr, 0), R_GlobalEnv, &er));
-            if (er)
+            if (er) {
                 REprintf("vimcom error executing command: slotNames(%s%s)\n",
                          curenv, xname);
-            else
+            } else {
                 len = length(sn);
+                /* The label must count only the slots R_has_slot() will
+                   actually list below, not every name slotNames() returns,
+                   or it disagrees with the children shown under it. */
+                for (int i = 0; i < len; i++) {
+                    if (R_has_slot(*x, Rf_install(CHAR(STRING_ELT(sn, i)))))
+                        nset++;
+                }
+            }
             UNPROTECT(1);
         } else {
             REprintf("vimcom error: invalid value in slotNames(%s%s)\n",
                      curenv, xname);
         }
         UNPROTECT(2);
-        snprintf(buf, 127, " [%d]", len);
+        snprintf(buf, 127, " [%d]", nset);
         p = vimcom_strcat(p, buf);
     }
 
