@@ -2917,6 +2917,9 @@ See also: |R_source|.
    "first argument has length > 1" (any tibble triggers it) and the
    latter was reported as not found. Each class is now tested in turn,
    and a namespaced name is resolved in its package.
+ * Stop leaving an empty "[No Name]" buffer each time the R Console is
+   hidden and reopened in Neovim. The new window is pointed at the
+   existing terminal and the unused buffer is wiped.
 
 0.9.21 (2025-04-15)
 

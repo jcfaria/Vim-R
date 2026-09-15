@@ -98,7 +98,14 @@ function ReOpenRWin()
     endfor
     let edbuf = bufname("%")
     call SplitWindowToR()
+    " vnew leaves an empty buffer in the new window. Point the window at
+    " the existing R terminal and wipe the unused one, otherwise a
+    " "[No Name]" buffer accumulates on every hide/reopen.
+    let scratch = bufnr("%")
     call nvim_win_set_buf(0, g:rplugin.R_bufnr)
+    if bufexists(scratch) && scratch != g:rplugin.R_bufnr
+        exe "silent! bwipeout " . scratch
+    endif
     exe "sbuffer " . edbuf
     return 1
 endfunction
