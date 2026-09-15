@@ -67,3 +67,11 @@ but temporary files are used in a few cases.
    - [languageserver](https://cran.r-project.org/web/packages/languageserver/index.html): a language server for R.
 
    - [colorout](https://github.com/jalvesaq/colorout): a package to colorize R's output.
+
+
+## Maintained by:
+
+Faria, J. C.  
+Universidade Estadual de Santa Cruz - UESC  
+Departamento de Ciências Exatas - DCEX  
+Ilhéus - Bahia - Brasil
