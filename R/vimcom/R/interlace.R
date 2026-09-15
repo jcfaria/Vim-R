@@ -206,10 +206,14 @@ vim.latexmk_outdir <- function(rnwdir) {
             next
         lmk <- readLines(f, warn = FALSE)
         idx <- grep("\\$out_dir\\s*=", lmk)
-        if (length(idx) == 1) {
-            return(sub(".*\\$out_dir\\s*=\\s*['\"](.*)['\"].*",
-                       "\\1", lmk[idx]))
+        out <- NULL
+        for (i in idx) {
+            d <- sub(".*\\$out_dir\\s*=\\s*['\"](.*)['\"].*", "\\1", lmk[i])
+            if (nzchar(d) && d != lmk[i])
+                out <- d
         }
+        if (!is.null(out))
+            return(out)
     }
     NULL
 }

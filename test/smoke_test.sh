@@ -295,7 +295,26 @@ if [ "$got" = "from_home" ]; then
 else
     fail "vim.latexmk_outdir() returned '$got', expected 'from_home'"
 fi
-rm -f "$HOME/.latexmkrc" "$HOME/.config/latexmk/latexmkrc"
+rm -f "$HOME/.latexmkrc"
+got="$(lmk_outdir "$LMK_UNIT/doc")"
+if [ "$got" = "from_xdg" ]; then
+    pass "vim.latexmk_outdir(): \$XDG_CONFIG_HOME/latexmk/latexmkrc is the last resort"
+else
+    fail "vim.latexmk_outdir() returned '$got', expected 'from_xdg'"
+fi
+rm -f "$HOME/.config/latexmk/latexmkrc"
+
+# A latexmkrc with more than one matching line must keep the last one that
+# actually sets $out_dir, exactly like s:LatexmkOutDirFrom() in R/rnw_fun.vim.
+printf '%s\n%s\n' '$out_dir = "from_template";' '$out_dir = "from_override"' \
+    > "$LMK_UNIT/doc/.latexmkrc"
+got="$(lmk_outdir "$LMK_UNIT/doc")"
+if [ "$got" = "from_override" ]; then
+    pass "vim.latexmk_outdir(): the last matching \$out_dir line wins, like the Vim side"
+else
+    fail "vim.latexmk_outdir() returned '$got', expected 'from_override'"
+fi
+rm -f "$LMK_UNIT/doc/.latexmkrc"
 
 # ----------------------------------------------------------------- toolchain --
 

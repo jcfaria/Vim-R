@@ -2941,8 +2941,10 @@ See also: |R_source|.
    wrong place and the .log was not found, with no error. The search
    is now: beside the document, the current directory, ~/.latexmkrc,
    $XDG_CONFIG_HOME/latexmk/latexmkrc, and ~/.config/latexmk/latexmkrc.
-   The first that exists and sets $out_dir is used. See |R_latexcmd|
-   and |Vim-R-SyncTeX|.
+   The first that exists and sets $out_dir is used, and a file with more
+   than one matching line is read the same way by Vim and by R: the
+   last line that sets $out_dir wins. See |R_latexcmd| and
+   |Vim-R-SyncTeX|.
  * Fold by the levels of the note comments when `r_syntax_folding` is 0:
    whether Vim-R stood aside for syntax folding was decided by the mere
    existence of `g:r_syntax_folding`, and not by its value, so whoever read
