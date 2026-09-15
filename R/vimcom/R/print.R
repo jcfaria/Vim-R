@@ -1,3 +1,23 @@
+#' exists(), resolved against a package namespace when `ns` is given instead
+#' of the global environment (`exists("stats::lm")` is always false).
+#' `bare_inherits`/`ns_inherits` default to what a plain object lookup and a
+#' namespaced lookup each need; callers doing method dispatch override
+#' `ns_inherits` to search up from the namespace.
+ns_exists <- function(name, ns, bare_inherits = TRUE, ns_inherits = FALSE) {
+    if (is.null(ns))
+        exists(name, inherits = bare_inherits)
+    else
+        exists(name, where = ns, inherits = ns_inherits)
+}
+
+#' get(), with the same namespace resolution as ns_exists().
+ns_get <- function(name, ns, bare_inherits = TRUE, ns_inherits = FALSE) {
+    if (is.null(ns))
+        get(name, inherits = bare_inherits)
+    else
+        get(name, envir = ns, inherits = ns_inherits)
+}
+
 #' Command sent to R console after `\rp`.
 #' @param object Object under cursor.
 #' @param firstobj If `object` is a function, the the first function parameter.
@@ -20,11 +40,7 @@ vim.print <- function(object, firstobj) {
         }
     }
 
-    found <- if (is.null(ns))
-        exists(name)
-    else
-        exists(name, where = ns, inherits = FALSE)
-    if (!found)
+    if (!ns_exists(name, ns))
         stop("object '", object, "' not found")
 
     if (!missing(firstobj)) {
@@ -39,15 +55,8 @@ vim.print <- function(object, firstobj) {
                 # exists() raise "first argument has length > 1" on R 4.6.
                 for (cls in objclass) {
                     method <- paste0(name, ".", cls)
-                    has_method <- if (is.null(ns))
-                        exists(method)
-                    else
-                        exists(method, where = ns, inherits = TRUE)
-                    if (has_method) {
-                        .newobj <- if (is.null(ns))
-                            get(method)
-                        else
-                            get(method, envir = ns, inherits = TRUE)
+                    if (ns_exists(method, ns, ns_inherits = TRUE)) {
+                        .newobj <- ns_get(method, ns, ns_inherits = TRUE)
                         message(paste0("Note: Printing ", name, ".", cls))
                         break
                     }
@@ -56,9 +65,6 @@ vim.print <- function(object, firstobj) {
         }
     }
     if (!exists(".newobj"))
-        .newobj <- if (is.null(ns))
-            get(name)
-        else
-            get(name, envir = ns, inherits = FALSE)
+        .newobj <- ns_get(name, ns)
     print(.newobj)
 }
