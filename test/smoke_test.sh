@@ -1791,6 +1791,9 @@ else
          <(fingerprint_real_libs) | sed 's/^/      | /'
 fi
 
+# w_todo/ is the agent's untracked scratch directory (see its own header);
+# it is not produced by this script or by the plugin, so it is excluded
+# below rather than left to coincidentally never match a leftover pattern.
 STRAY="$(find "$REPO" -path "$REPO/.git" -prune -o \
     -path "$REPO/w_todo" -prune -o \
     -path "$REPO/R/objlist" -prune -o \
