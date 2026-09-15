@@ -262,6 +262,41 @@ else
     die "find.package(\"vimcom\") is '$FOUND_VIMCOM', expected '$R_LIB/vimcom'"
 fi
 
+# vim.latexmk_outdir() is the R half of the latexmkrc search; SetPDFdir() is
+# the editor half and is asserted per editor. HOME is already the scratch one.
+head1 "vimcom latexmkrc search"
+LMK_UNIT="$WORK/lmk-unit"
+mkdir -p "$LMK_UNIT/doc" "$LMK_UNIT/cwd" "$HOME/.config/latexmk"
+printf '%s\n' '$out_dir = "from_doc"' > "$LMK_UNIT/doc/.latexmkrc"
+printf '%s\n' '$out_dir = "from_cwd"' > "$LMK_UNIT/cwd/.latexmkrc"
+printf '%s\n' '$out_dir = "from_home"' > "$HOME/.latexmkrc"
+printf '%s\n' '$out_dir = "from_xdg"' > "$HOME/.config/latexmk/latexmkrc"
+lmk_outdir() { # lmk_outdir <rnwdir>
+    (cd "$LMK_UNIT/cwd" && Rscript --vanilla -e \
+        "suppressPackageStartupMessages(library(vimcom)); cat(vimcom:::vim.latexmk_outdir('$1'))")
+}
+got="$(lmk_outdir "$LMK_UNIT/doc")"
+if [ "$got" = "from_doc" ]; then
+    pass "vim.latexmk_outdir(): .latexmkrc beside the document wins"
+else
+    fail "vim.latexmk_outdir() returned '$got', expected 'from_doc'"
+fi
+rm -f "$LMK_UNIT/doc/.latexmkrc"
+got="$(lmk_outdir "$LMK_UNIT/doc")"
+if [ "$got" = "from_cwd" ]; then
+    pass "vim.latexmk_outdir(): .latexmkrc in the current directory is next"
+else
+    fail "vim.latexmk_outdir() returned '$got', expected 'from_cwd'"
+fi
+rm -f "$LMK_UNIT/cwd/.latexmkrc"
+got="$(lmk_outdir "$LMK_UNIT/doc")"
+if [ "$got" = "from_home" ]; then
+    pass "vim.latexmk_outdir(): ~/.latexmkrc is used when no project file sets \$out_dir"
+else
+    fail "vim.latexmk_outdir() returned '$got', expected 'from_home'"
+fi
+rm -f "$HOME/.latexmkrc" "$HOME/.config/latexmk/latexmkrc"
+
 # ----------------------------------------------------------------- toolchain --
 
 # Everything below is optional: what is missing makes an assertion SKIP.
@@ -520,6 +555,20 @@ EOF
 \begin{document}
 VIMRSMOKEBIBRNW.
 \bibliography{smoke_refs}
+\end{document}
+EOF
+
+    # Project-local latexmkrc: SetPDFdir() used to read only ~/.latexmkrc, so
+    # SyncTeX looked for the pdf next to the document while latexmk wrote it
+    # in build/. Never compiled; only the directory the plugin computes.
+    mkdir -p "$d/lmkproj/build"
+    printf '%s\n' '$out_dir = "build"' > "$d/lmkproj/.latexmkrc"
+    cat > "$d/lmkproj/paper.Rnw" <<'EOF'
+\documentclass{article}
+\begin{document}
+<<>>=
+1
+@
 \end{document}
 EOF
 }
@@ -901,6 +950,59 @@ for [s:f, s:tag] in [['smoke_bib.Rmd', 'rmd'], ['smoke_bib.qmd', 'quarto'],
                 \\ join(map(copy(s:r), 'v:val["word"]'), ' ')))
     call writefile(s:l, '$OUT/bib_' . s:tag . '.txt')
 endfor
+edit! smoke.R
+EOF
+
+# S4 object with a truly unset slot, then an object later in ls() order.
+# If vimcom_glbnv_line() still calls R_do_slot() blindly, the listing aborts
+# and smoke_z_after never appears in the Object Browser.
+cat > "$WORK/act_s4.vim" <<EOF
+call SmokeGoToEditorWin()
+call g:SendCmdToR('setClass("UnsetDemo", slots = c(present = "numeric", missing = "ANY")); smoke_s4 <- new("UnsetDemo", present = 1); attr(smoke_s4, "missing") <- NULL; smoke_z_after <- "VIMR_SMOKE_AFTER_S4"; smoke_s3 <- structure(1:3, class = c("smoke_class", "integer"))')
+EOF
+
+# vim.print() with a multi-class S3 object and a namespaced name. Both used
+# to fail: exists() received the whole class vector, and exists("stats::lm")
+# is always false.
+cat > "$WORK/act_print.vim" <<EOF
+call SmokeGoToEditorWin()
+" Arguments to cat() are separate so the line R echoes cannot match the
+" line R prints (the same trick as the idle marker).
+call g:SendCmdToR('tryCatch({vim.print("print", "smoke_s3"); cat("VIMR_SMOKE_PRINT_S3:", "OK", "\\n")}, error = function(e) cat("VIMR_SMOKE_PRINT_S3:", "ERR", conditionMessage(e), "\\n"))')
+call g:SendCmdToR('tryCatch({vim.print("stats::lm"); cat("VIMR_SMOKE_PRINT_NS:", "OK", "\\n")}, error = function(e) cat("VIMR_SMOKE_PRINT_NS:", "ERR", conditionMessage(e), "\\n"))')
+EOF
+
+# Hide the R Console and start R again. On Neovim that reopens the existing
+# terminal through ReOpenRWin(); the empty buffer vnew created must be wiped.
+cat > "$WORK/act_reopen.vim" <<EOF
+call SmokeGoToEditorWin()
+if has('nvim') && has_key(g:rplugin, 'R_bufnr') && bufexists(g:rplugin.R_bufnr)
+    let s:rwin = bufwinid(g:rplugin.R_bufnr)
+    if s:rwin != -1
+        call win_gotoid(s:rwin)
+        close
+    endif
+    call SmokeGoToEditorWin()
+    call StartR('R')
+endif
+let s:unnamed = 0
+for s:b in getbufinfo({'buflisted': 1})
+    if s:b.name == ''
+        let s:unnamed += 1
+    endif
+endfor
+call writefile([
+            \ 'unnamed ' . s:unnamed,
+            \ 'r_exists ' . (has_key(g:rplugin, 'R_bufnr') && bufexists(g:rplugin.R_bufnr))
+            \ ], '$OUT/reopen.txt')
+EOF
+
+# SetPDFdir() against a project-local .latexmkrc. No compilation.
+cat > "$WORK/act_lmkpdfdir.vim" <<EOF
+call SmokeGoToEditorWin()
+edit lmkproj/paper.Rnw
+call SetPDFdir()
+call writefile([get(b:, 'rplugin_pdfdir', 'UNSET')], '$OUT/lmkpdfdir.txt')
 edit! smoke.R
 EOF
 
@@ -1483,6 +1585,16 @@ run_editor() { # run_editor <name> <editor-command...>
     run_note_checks "$name"
     run_bib_checks "$name" "$proj"
 
+    # SetPDFdir() reads a latexmkrc; no R and no latexmk.
+    if do_act "$name" lmkpdfdir; then
+        local want_pdfdir="$proj/lmkproj/build"
+        if file_is lmkpdfdir.txt "$want_pdfdir"; then
+            pass "$name: SetPDFdir() honours a project-local .latexmkrc (\$out_dir = build)"
+        else
+            fail "$name: SetPDFdir() returned '$(cat "$OUT/lmkpdfdir.txt" 2>/dev/null)', expected '$want_pdfdir'"
+        fi
+    fi
+
     # Once a step fails there is no point in waiting out the timeout of every
     # step that depends on it: report them as failures right away.
     local broken=0
@@ -1535,6 +1647,54 @@ run_editor() { # run_editor <name> <editor-command...>
             fail "$name: '$want' not found in the Object_Browser buffer"
         fi
     done
+
+    if [ "$broken" -eq 0 ]; then
+        do_act "$name" s4 || broken=1
+        if [ "$broken" -eq 0 ] && r_is_idle "$name" s4 60; then
+            if wait_until 60 'file_has objbrowser.txt "#smoke_z_after"' ; then
+                :
+            fi
+            if file_has objbrowser.txt '#smoke_s4'; then
+                pass "$name: Object Browser shows '#smoke_s4' (S4 with an unset slot)"
+            else
+                fail "$name: '#smoke_s4' not found in the Object_Browser buffer"
+            fi
+            if file_has objbrowser.txt '#smoke_z_after'; then
+                pass "$name: Object Browser still lists objects created after an unset S4 slot"
+            else
+                fail "$name: '#smoke_z_after' not found; the Object Browser listing aborted"
+            fi
+        fi
+
+        do_act "$name" print || broken=1
+        if [ "$broken" -eq 0 ] && r_is_idle "$name" print 60; then
+            if file_has rconsole.txt 'VIMR_SMOKE_PRINT_S3: OK' &&
+                    ! file_has rconsole.txt 'VIMR_SMOKE_PRINT_S3: ERR' &&
+                    ! file_has rconsole.txt 'first argument has length > 1'; then
+                pass "$name: vim.print() accepts an object with several S3 classes"
+            else
+                fail "$name: vim.print() failed on a multi-class S3 object"
+                info "console: $(grep -E 'PRINT_S3|first argument' "$OUT/rconsole.txt" 2>/dev/null | tail -3 | tr '\n' '/')"
+            fi
+            if file_has rconsole.txt 'VIMR_SMOKE_PRINT_NS: OK' &&
+                    ! file_has rconsole.txt 'VIMR_SMOKE_PRINT_NS: ERR' &&
+                    ! file_has rconsole.txt "object 'stats::lm' not found"; then
+                pass "$name: vim.print() resolves a pkg::fun name"
+            else
+                fail "$name: vim.print() failed on stats::lm"
+                info "console: $(grep -E 'PRINT_NS|not found' "$OUT/rconsole.txt" 2>/dev/null | tail -3 | tr '\n' '/')"
+            fi
+        fi
+
+        do_act "$name" reopen || true
+        if file_is reopen.txt $'unnamed 0\nr_exists 1' ||
+                { file_has reopen.txt 'unnamed 0' && file_has reopen.txt 'r_exists 1'; }; then
+            pass "$name: reopening the R Console leaves no [No Name] buffer"
+        else
+            fail "$name: reopening the R Console left a [No Name] buffer or lost the terminal"
+            info "recorded: $(tr '\n' '/' < "$OUT/reopen.txt" 2>/dev/null)"
+        fi
+    fi
 
     if [ "$broken" -eq 0 ]; then
         run_document_checks "$name" "$proj"
@@ -1591,6 +1751,8 @@ else
 fi
 
 STRAY="$(find "$REPO" -path "$REPO/.git" -prune -o \
+    -path "$REPO/w_todo" -prune -o \
+    -path "$REPO/R/objlist" -prune -o \
     \( -name '*.swp' -o -name '*.swo' -o -name 'nvim.log' -o -name '.netrwhist' \
        -o -name '*.tmp.R' -o -name '*.aux' -o -name '*.synctex.gz' \
        -o -name 'objlist' \) \
