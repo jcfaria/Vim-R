@@ -598,6 +598,14 @@ static char *vimcom_glbnv_line(SEXP *x, const char *xname, const char *curenv,
             if (len > 0) {
                 for (int i = 0; i < len; i++) {
                     ename = CHAR(STRING_ELT(sn, i));
+                    /* slotNames() lists every slot of the class, including
+                       ones that were never set. ggplot2 4's S7 objects are
+                       the everyday case. R_do_slot() then errors, and
+                       because this runs in R's idle callback the rest of
+                       .GlobalEnv is never listed. R_has_slot() is
+                       documented in Writing R Extensions §5.9.6. */
+                    if (!R_has_slot(*x, Rf_install(ename)))
+                        continue;
                     PROTECT(elmt = R_do_slot(*x, Rf_install(ename)));
                     p = vimcom_glbnv_line(&elmt, ename, newenv, p, depth + 1);
                     UNPROTECT(1);

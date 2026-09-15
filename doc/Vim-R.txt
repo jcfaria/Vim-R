@@ -2908,6 +2908,10 @@ See also: |R_source|.
    session and for whichever buffer happens to be current then, so opening an
    Rmd document, or a second Rnoweb one, before searching left it undefined.
    Every Rnoweb buffer computes its own now. See |Vim-R-SyncTeX|.
+ * Keep the Object Browser updating when an S4 object has a slot that is
+   not set: ggplot2 4 is the everyday case. The listing used to abort
+   inside R's idle task, so objects created afterwards never appeared
+   and nothing was shown to the user. Absent slots are now skipped.
 
 0.9.21 (2025-04-15)
 
