@@ -112,6 +112,12 @@ function IsJobRunning(key)
     return g:rplugin.jobs[a:key]
 endfunction
 
+" The sentinel of a job not started has to be 0 here, and the string "no" in
+" Vim's copy of this dictionary (see R/vimrcom.vim). Neither is free to change:
+" IsJobRunning() returns the entry itself and every caller reads it as a
+" boolean, while under Vim a Number compared with a Channel raises E913.
+" Anything written against this field is therefore editor specific, and a
+" comparison with 0 is only valid here.
 let g:rplugin.jobs = {"Server": 0, "R": 0, "Terminal emulator": 0, "BibComplete": 0}
 let g:rplugin.job_handlers = {
             \ 'on_stdout': function('ROnJobStdout'),

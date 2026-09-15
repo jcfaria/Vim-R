@@ -116,6 +116,14 @@ function IsJobRunning(key)
     endif
 endfunction
 
+" The sentinel of a job not started has to be a string here, and 0 in Neovim's
+" copy of this dictionary (see R/nvimrcom.vim). Neither is free to change:
+" GetJobTitle() compares every entry with a real channel, and Vim raises E913
+" when a Number is compared with a Channel (E910 with the Job that
+" R/vimbuffer.vim keeps under "R"), whereas a String compares false and is
+" harmless; Neovim's IsJobRunning() returns the entry itself, so there it has
+" to be falsy. Anything written against this field is therefore editor
+" specific, and a comparison with 0 is only valid on the Neovim side.
 let g:rplugin.jobs = {"Server": "no", "R": "no", "Terminal emulator": "no", "BibComplete": "no"}
 let g:rplugin.job_handlers = {
             \ 'out_cb':  'ROnJobStdout',
