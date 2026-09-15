@@ -20,12 +20,12 @@ loving care ..._
 ## Installation and use
 
 Please, read sections _Installation_ and _Use_ of the
-[documentation](https://github.com/jcfaria/Vim-R/blob/master/doc/Vim-R.txt).
+[documentation](https://github.com/jcfaria/Vim-R/blob/main/doc/Vim-R.txt).
 
 ## The communication between R and Vim
 
 The diagram below shows how the communication between Vim and R works.
-![Vim-R communication](https://raw.githubusercontent.com/jcfaria/Vim-R/master/vimrcom.svg "Vim-R communication")
+![Vim-R communication](https://raw.githubusercontent.com/jcfaria/Vim-R/HEAD/vimrcom.svg "Vim-R communication")
 
 The black arrows represent all commands that you trigger in the editor and
 that you can see being pasted into R Console.

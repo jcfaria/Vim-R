@@ -825,7 +825,7 @@ will be no communication between R and the new Vim instance.
 Please see the explanation of the communication between Vim and R at the end
 of
 
-   https://github.com/jcfaria/Vim-R/blob/master/README.md
+   https://github.com/jcfaria/Vim-R/blob/main/README.md
 
 
 ------------------------------------------------------------------------------

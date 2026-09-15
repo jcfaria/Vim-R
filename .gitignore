@@ -13,3 +13,4 @@ R/vimcom/src/apps/vimrserver.exe
 R/vimcom/src/apps/compile_flags.txt
 R/__pycache__/
 R/*.pyc
+R/objlist/

@@ -485,7 +485,7 @@ endif
 
 " 2018-03-31
 if exists('g:R_tmux_split')
-    call RWarningMsg('The option R_tmux_split no longer exists. Please see https://github.com/jalvesaq/Vim-R/blob/master/R/tmux_split.md')
+    call RWarningMsg('The option R_tmux_split no longer exists. Please see https://github.com/jcfaria/Vim-R/blob/main/R/tmux_split.md')
 endif
 
 " 2020-05-18
