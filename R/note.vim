@@ -116,12 +116,19 @@ function RNoteSetFolding()
     if index(g:R_note_folding, &filetype) == -1
         return
     endif
-    if exists("g:r_syntax_folding")
+    " The value is what matters, not the existence: the runtime's R syntax
+    " script takes 'foldmethod' at "exists(...) && g:r_syntax_folding"
+    " (syntax/r.vim), so a value of 0 leaves syntax folding off and there is
+    " nothing to yield to. Testing only the existence used to leave whoever
+    " disabled syntax folding by writing 0, instead of deleting the line,
+    " with no folding at all.
+    if exists("g:r_syntax_folding") && g:r_syntax_folding
         if !exists("s:said_syntax_folding")
             let s:said_syntax_folding = 1
             call RWarningMsg('R_note_folding is ignored because '
-                        \ . 'g:r_syntax_folding is set. The two are mutually '
-                        \ . 'exclusive. Please see Vim-R documentation.')
+                        \ . 'g:r_syntax_folding is enabled. The two are '
+                        \ . 'mutually exclusive. Please see Vim-R '
+                        \ . 'documentation.')
         endif
         return
     endif

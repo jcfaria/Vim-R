@@ -892,14 +892,33 @@ call writefile(['lnums ' . join(map(getloclist(0), 'v:val.lnum'), ' '),
 close
 EOF
 
-# Note comments: that 'foldmethod' is untouched until the option is set, the
-# fold level of every line, and the text of the closed folds. The option is
-# put back to its default so that no later assertion runs in a folded buffer.
+# Note comments: that 'foldmethod' is untouched until the option is set, what
+# each state of g:r_syntax_folding decides, the fold level of every line, and
+# the text of the closed folds. The option is put back to its default so that
+# no later assertion runs in a folded buffer.
 cat > "$WORK/act_notefold.vim" <<EOF
 call SmokeGoToEditorWin()
 edit! smoke.R
 let s:l = ['default ' . &l:foldmethod]
 let g:R_note_folding = ['r']
+" What RNoteSetFolding() decides about g:r_syntax_folding, isolated. Vim's own
+" R syntax script takes 'foldmethod' only when the value is true, so a value of
+" 0 leaves syntax folding off and must not cost the note folds, while a true
+" value must still be yielded to. 'foldmethod' is put back to manual and the
+" function is called directly, which reads its choice instead of whatever the
+" syntax script, an inherited window option or the autocmd order left behind.
+for [s:tag, s:val] in [['unset', -1], ['zero', 0], ['one', 1]]
+    if s:val < 0
+        silent! unlet g:r_syntax_folding
+    else
+        let g:r_syntax_folding = s:val
+    endif
+    setlocal foldmethod=manual foldexpr=0
+    call RNoteSetFolding()
+    call add(s:l, printf('syntax_%s %s %s', s:tag, &l:foldmethod, &l:foldexpr))
+endfor
+silent! unlet g:r_syntax_folding
+setlocal foldmethod=manual foldexpr=0
 edit! smoke.R
 call add(s:l, printf('set %s %s %s', &l:foldmethod, &l:foldexpr, &l:foldtext))
 call add(s:l, 'levels ' . join(map(range(1, line('\$')),
@@ -1487,6 +1506,9 @@ run_note_checks() { # run_note_checks <name>
     do_act "$name" notefold || return
 
     for want in 'default manual' \
+                'syntax_unset expr RNoteFoldExpr(v:lnum)' \
+                'syntax_zero expr RNoteFoldExpr(v:lnum)' \
+                'syntax_one manual 0' \
                 'set expr RNoteFoldExpr(v:lnum) RNoteFoldText()' \
                 "levels $SMOKE_NOTE_FOLDLEVELS" \
                 'text 4 #. Section one  [8 lines]' \

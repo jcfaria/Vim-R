@@ -2599,11 +2599,14 @@ prefer it anyway, or a 'foldtext' of your own, put in your |vimrc|:
 The folds are made with 'foldexpr' and not with syntax regions, which report
 the wrong level after an edit until `:syntax sync fromstart` is run, and
 break the folds of `{}` that Vim's own R syntax script creates. That script
-folds by syntax when `g:r_syntax_folding` is set, which is mutually exclusive
-with `R_note_folding`: if `g:r_syntax_folding` exists, Vim-R does not fold by
-note levels, and warns once. Note that Vim's script tests only whether
-`g:r_syntax_folding` exists in one place and its value in another, so even a
-value of 0 creates fold regions.
+folds by syntax when `g:r_syntax_folding` is non-zero, which is mutually
+exclusive with `R_note_folding`: if syntax folding is enabled, Vim-R does not
+fold by note levels, and warns once. A value of 0 leaves syntax folding off,
+and Vim-R then folds by note levels exactly as it does when the variable was
+never set, so disabling syntax folding with a 0 does not cost you the note
+folds. Note that Vim's script still creates its fold regions on the mere
+existence of the variable, so a value of 0 pays for them without getting any
+fold out of them; delete the line to avoid that too.
 
 
 ==============================================================================
@@ -2940,6 +2943,15 @@ See also: |R_source|.
    $XDG_CONFIG_HOME/latexmk/latexmkrc, and ~/.config/latexmk/latexmkrc.
    The first that exists and sets $out_dir is used. See |R_latexcmd|
    and |Vim-R-SyncTeX|.
+ * Fold by the levels of the note comments when `r_syntax_folding` is 0:
+   whether Vim-R stood aside for syntax folding was decided by the mere
+   existence of `g:r_syntax_folding`, and not by its value, so whoever read
+   that syntax folding can be slow and disabled it by writing
+   `let r_syntax_folding = 0`, instead of deleting the line, was left with
+   no folding at all from either side, and with a warning stating that
+   syntax folding was in use. The value is tested now, exactly as Vim's own
+   R syntax script tests it before taking 'foldmethod', so a 0 disables
+   syntax folding without costing the note folds. See |Vim-R-notes|.
 
 0.9.21 (2025-04-15)
 
