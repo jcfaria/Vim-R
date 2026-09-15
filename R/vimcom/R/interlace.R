@@ -187,6 +187,33 @@ ShowTexErrors <- function(texf, logf, l) {
     }
 }
 
+#' First latexmkrc that exists and sets `$out_dir`. Order: beside the
+#' document, the current directory, `~/.latexmkrc`, `$XDG_CONFIG_HOME`,
+#' then `~/.config/latexmk/latexmkrc`. Keep in step with `s:FindLatexmkOutDir()`.
+#' @param rnwdir Directory of the Rnoweb file.
+#' @return The value of `$out_dir`, or `NULL`.
+vim.latexmk_outdir <- function(rnwdir) {
+    cands <- c(file.path(rnwdir, ".latexmkrc"),
+               file.path(getwd(), ".latexmkrc"),
+               path.expand("~/.latexmkrc"))
+    xdg <- Sys.getenv("XDG_CONFIG_HOME", unset = "")
+    if (nzchar(xdg))
+        cands <- c(cands, file.path(xdg, "latexmk", "latexmkrc"))
+    cands <- c(cands, path.expand("~/.config/latexmk/latexmkrc"))
+    cands <- unique(cands[nzchar(cands)])
+    for (f in cands) {
+        if (!file.exists(f))
+            next
+        lmk <- readLines(f, warn = FALSE)
+        idx <- grep("\\$out_dir\\s*=", lmk)
+        if (length(idx) == 1) {
+            return(sub(".*\\$out_dir\\s*=\\s*['\"](.*)['\"].*",
+                       "\\1", lmk[idx]))
+        }
+    }
+    NULL
+}
+
 #' Knitr or Sweave an Rnoweb document.
 #' @param rnwf Rnoweb file.
 #' @param rnwdir Directory where the Rnoweb file is.
@@ -263,14 +290,9 @@ vim.interlace.rnoweb <- function(rnwf, rnwdir, latexcmd = "latexmk",
         logf <- paste0(builddir, "/", logf)
 
     if (!file.exists(logf)) {
-        if (latexcmd == "latexmk" && file.exists("~/.latexmkrc")) {
-            lmk <- readLines("~/.latexmkrc")
-            idx <- grep("\\$out_dir\\s*=", lmk)
-            if (length(idx) == 1) {
-                logf <- paste0(sub(".*\\$out_dir\\s*=\\s*['\"](.*)['\"].*",
-                                   "\\1", lmk[idx]), "/",
-                               sub("\\....$", ".log", rnwf))
-            }
+        outdir <- if (latexcmd == "latexmk") vim.latexmk_outdir(rnwdir) else NULL
+        if (!is.null(outdir)) {
+            logf <- paste0(outdir, "/", sub("\\....$", ".log", rnwf))
         } else {
             idx <- grep("-output-directory=", latexargs)
             if (length(idx) == 1) {

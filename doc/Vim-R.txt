@@ -1829,7 +1829,17 @@ saved in the same directory as the Rnoweb file, you should set the value of
 >vim
    let R_latex_build_dir = 'build'
 <
-See also |R_bib_compl|.
+When `R_latexcmd` is `latexmk` (the default), Vim-R also reads `$out_dir`
+from a latexmkrc, and uses it both for SyncTeX forward search and to find
+the `.log`. The first file that exists and sets `$out_dir` wins, in this
+order: `.latexmkrc` beside the document, `.latexmkrc` in the current
+directory, `~/.latexmkrc`, `$XDG_CONFIG_HOME/latexmk/latexmkrc`, and
+`~/.config/latexmk/latexmkrc`. A project-local file therefore overrides
+the home one. `R_latex_build_dir` and a `-outdir` / `-output-directory`
+argument of `R_latexcmd` still take precedence over the latexmkrc when
+they are set.
+
+See also |R_bib_compl| and |Vim-R-SyncTeX|.
 
 
 ------------------------------------------------------------------------------
@@ -2466,6 +2476,9 @@ You do not have to do anything special in your Rnoweb document if you are
 using the knitr package and are editing single-file Rnoweb documents.
 Otherwise, keep reading...
 
+If latexmk writes the PDF to another directory, SyncTeX follows `$out_dir`
+from a latexmkrc (see |R_latexcmd|).
+
 If you use `Sweave()` rather than `knit()`, you must put in your Rnoweb
 document:
 >
@@ -2920,6 +2933,13 @@ See also: |R_source|.
  * Stop leaving an empty "[No Name]" buffer each time the R Console is
    hidden and reopened in Neovim. The new window is pointed at the
    existing terminal and the unused buffer is wiped.
+ * Honour a project-local .latexmkrc that sets $out_dir: only ~/.latexmkrc
+   was read, so the PDF was built elsewhere, SyncTeX jumped to the
+   wrong place and the .log was not found, with no error. The search
+   is now: beside the document, the current directory, ~/.latexmkrc,
+   $XDG_CONFIG_HOME/latexmk/latexmkrc, and ~/.config/latexmk/latexmkrc.
+   The first that exists and sets $out_dir is used. See |R_latexcmd|
+   and |Vim-R-SyncTeX|.
 
 0.9.21 (2025-04-15)
 

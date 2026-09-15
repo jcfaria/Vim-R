@@ -479,19 +479,59 @@ function SyncTeX_forward(...)
     call SyncTeX_forward2(SyncTeX_GetMaster() . '.tex', b:rplugin_pdfdir . "/" . basenm . ".pdf", texln, 1)
 endfunction
 
+" $out_dir from a latexmkrc, or '' if the file is missing or does not set it.
+function s:LatexmkOutDirFrom(fname)
+    if a:fname == '' || !filereadable(a:fname)
+        return ''
+    endif
+    let ltxmk = readfile(a:fname)
+    let out = ''
+    for line in ltxmk
+        if line =~ '\$out_dir\s*='
+            let d = substitute(line, '.*\$out_dir\s*=\s*"\(.*\)".*', '\1', '')
+            let d = substitute(d, ".*\\$out_dir\\s*=\\s*'\\(.*\\)'.*", '\1', '')
+            if d != '' && d != line
+                let out = d
+            endif
+        endif
+    endfor
+    return out
+endfunction
+
+" First latexmkrc that exists and sets $out_dir. Order: beside the
+" document, the current directory, ~/.latexmkrc, $XDG_CONFIG_HOME, then
+" ~/.config/latexmk/latexmkrc. Keep in step with vim.latexmk_outdir().
+function s:FindLatexmkOutDir(docdir)
+    let cands = [a:docdir . '/.latexmkrc', getcwd() . '/.latexmkrc',
+                \ expand('~/.latexmkrc')]
+    if $XDG_CONFIG_HOME != ''
+        call add(cands, $XDG_CONFIG_HOME . '/latexmk/latexmkrc')
+    endif
+    call add(cands, expand('~/.config/latexmk/latexmkrc'))
+    let seen = {}
+    for f in cands
+        if f == '' || has_key(seen, f)
+            continue
+        endif
+        let seen[f] = 1
+        let d = s:LatexmkOutDirFrom(f)
+        if d != ''
+            return d
+        endif
+    endfor
+    return ''
+endfunction
+
 function SetPDFdir()
     let master = SyncTeX_GetMaster()
     let mdir = substitute(master, '\(.*\)/.*', '\1', '')
     let b:rplugin_pdfdir = "."
     " Latexmk has an option to create the PDF in a directory other than '.'
-    if (g:R_latexcmd[0] =~ "default" || g:R_latexcmd[0] =~ "latexmk") && filereadable(expand("~/.latexmkrc"))
-        let ltxmk = readfile(expand("~/.latexmkrc"))
-        for line in ltxmk
-            if line =~ '\$out_dir\s*='
-                let b:rplugin_pdfdir = substitute(line, '.*\$out_dir\s*=\s*"\(.*\)".*', '\1', '')
-                let b:rplugin_pdfdir = substitute(b:rplugin_pdfdir, ".*\\$out_dir\\s*=\\s*'\\(.*\\)'.*", '\1', '')
-            endif
-        endfor
+    if g:R_latexcmd[0] =~ "default" || g:R_latexcmd[0] =~ "latexmk"
+        let outdir = s:FindLatexmkOutDir(mdir)
+        if outdir != ''
+            let b:rplugin_pdfdir = outdir
+        endif
     endif
     if join(g:R_latexcmd) =~ "-outdir" || join(g:R_latexcmd) =~ "-output-directory"
         let b:rplugin_pdfdir = substitute(join(g:R_latexcmd), '.*\(-outdir\|-output-directory\)\s*=*\s*', '', '')
