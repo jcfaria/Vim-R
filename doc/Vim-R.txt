@@ -2399,7 +2399,7 @@ better than Vim-R. Examples:
 ------------------------------------------------------------------------------
 6.37. Options for accessing Remote R from local Vim        *R_remote_compldir*
 
-See https://github.com/jcfaria/Vim-R/wiki/Remote-access
+See https://github.com/jcfaria/Vim-R/blob/main/doc/remote_access.md
 
 
 ------------------------------------------------------------------------------
