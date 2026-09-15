@@ -2912,6 +2912,11 @@ See also: |R_source|.
    not set: ggplot2 4 is the everyday case. The listing used to abort
    inside R's idle task, so objects created afterwards never appeared
    and nothing was shown to the user. Absent slots are now skipped.
+ * Print an object with several S3 classes, and a name of the form
+   pkg::fun, with <LocalLeader>rp: under R 4.6 the former raised
+   "first argument has length > 1" (any tibble triggers it) and the
+   latter was reported as not found. Each class is now tested in turn,
+   and a namespaced name is resolved in its package.
 
 0.9.21 (2025-04-15)
 
