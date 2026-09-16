@@ -281,11 +281,14 @@ vim.interlace.rnoweb <- function(rnwf, rnwdir, latexcmd = "latexmk",
 
     haserror <- FALSE
     if (bibtex && stts == 0) {
-        haserror <- system(paste("bibtex", sub("\\.tex$", ".aux", texf)))
+        # texf needs shell-quoting here, the same as it gets for the main
+        # compile step above (system(), unlike system2(), does not treat
+        # each paste()d word as a separate argument).
+        haserror <- system(paste("bibtex", shQuote(sub("\\.tex$", ".aux", texf))))
         if (!haserror) {
-            haserror <- system(paste(latexcmd, texf))
+            haserror <- system(paste(latexcmd, shQuote(texf)))
             if (!haserror)
-                haserror <- system(paste(latexcmd, texf))
+                haserror <- system(paste(latexcmd, shQuote(texf)))
         }
     }
 
