@@ -63,13 +63,15 @@ gbRd.get_args <- function(rdo, arg) {
             if (w %in% arg)
                 return(TRUE)
 
-        wrk <- strsplit(wrk0, ",[ ]*")
-        if (!is.character(wrk[[1]])) {
-            warning("wrk[[1]] is not a character vector! ", wrk)
+        # wrk0 can have more than one element when an Rd \item's name field
+        # mixes markup with a plain name (e.g. \item{\code{x}, y}{...}), so
+        # every element's split names must be checked, not only the first.
+        wrk <- unlist(strsplit(wrk0, ",[ ]*"))
+        if (!is.character(wrk)) {
+            warning("wrk is not a character vector! ", wrk)
             return(FALSE)
         }
-        wrk <- any(wrk[[1]] %in% arg)
-        wrk
+        any(wrk %in% arg)
     }
     sel <- !sapply(rdargs, f)
 
@@ -182,6 +184,11 @@ vim.args <- function(funcname, txt = "", pkg = NULL, objclass, extrainfo = FALSE
 
     if (is.null(pkg)) {
         pkgname <- sub(".*:", "", find(funcname, mode = "function")[1])
+        # find() returns character(0) for a function not on the search path
+        # (e.g. dispatched to an unattached S3 method), which turns pkgname
+        # into NA and crashes the pkgname[1] != ".GlobalEnv" check below.
+        if (is.na(pkgname))
+            pkgname <- ""
     } else {
         pkgname <- pkg
     }
@@ -494,8 +501,8 @@ GetFunDescription <- function(pkg) {
         als$name[[i]] <- cbind(als$alias[[i]], als$name[[i]])
     als <- do.call("rbind", als$name)
     if (nrow(als) > 1) {
-        als <- als[stats::complete.cases(als), ]
-        als <- als[!duplicated(als[, 2]), ]
+        als <- als[stats::complete.cases(als), , drop = FALSE]
+        als <- als[!duplicated(als[, 2]), , drop = FALSE]
     }
     colnames(als) <- c("alias", "name")
 
@@ -525,8 +532,8 @@ filter.objlist <- function(x) {
 #' @param pkg Library name.
 vim.buildargs <- function(afile, pkg) {
     ok <- try(require(pkg, warn.conflicts = FALSE,
-                      quietly = TRUE, character.only = TRUE))
-    if (!ok)
+                      quietly = TRUE, character.only = TRUE), silent = TRUE)
+    if (inherits(ok, "try-error") || !ok)
         return(invisible(NULL))
 
     pkgenv <- paste0("package:", pkg)
@@ -536,13 +543,13 @@ vim.buildargs <- function(afile, pkg) {
     sink(afile)
     for (obj in obj.list) {
         x <- try(get(obj, pkgenv, mode = "any"), silent = TRUE)
-        if (!is.function(x))
-            next
         if (inherits(x, "try-error")) {
             warning(paste0("Error while generating item completion for: ",
                            obj, " (", pkgenv, ").\n"))
             next
         }
+        if (!is.function(x))
+            next
         if (length(x) != 1) # base::letters
             next
         if (is.primitive(x)) {
@@ -587,8 +594,9 @@ vim.bol <- function(omnilist, packlist, allnames = FALSE) {
         curlib <- sub("^package:", "", curpack)
         if (vim.grepl(paste0(curpack, "$"), loadpack) == FALSE) {
             ok <- try(require(curlib, warn.conflicts = FALSE,
-                                      quietly = TRUE, character.only = TRUE))
-            if (!ok)
+                                      quietly = TRUE, character.only = TRUE),
+                      silent = TRUE)
+            if (inherits(ok, "try-error") || !ok)
                 next
         }
 
