@@ -316,6 +316,38 @@ else
 fi
 rm -f "$LMK_UNIT/doc/.latexmkrc"
 
+# vimr_log() (R/vimcom/R/log.R) is the R half of the w_log/ diagnostic
+# channels; R/log.vim is the Vim half and is exercised as the plugin loads
+# in run_editor below. Both must stay off unless a channel is named.
+head1 "vimcom diagnostic logging"
+LOG_UNIT="$WORK/log-unit"
+mkdir -p "$LOG_UNIT"
+vimr_log_test() { # vimr_log_test <channel> <log_channels_option> <log_dir>
+    Rscript --vanilla -e "
+        suppressPackageStartupMessages(library(vimcom))
+        options(vimcom.log_channels = '$2', vimcom.log_dir = '$3')
+        vimcom:::vimr_log('$1', 'smoke test message')"
+}
+vimr_log_test smoketest "" "$LOG_UNIT"
+if [ ! -e "$LOG_UNIT/smoketest.log" ]; then
+    pass "vimr_log(): writes nothing when no channel is configured"
+else
+    fail "vimr_log() wrote a log file with no channel configured"
+fi
+vimr_log_test smoketest "other,channels" "$LOG_UNIT"
+if [ ! -e "$LOG_UNIT/smoketest.log" ]; then
+    pass "vimr_log(): writes nothing when its channel is not in the list"
+else
+    fail "vimr_log() wrote a log file for a channel that was not enabled"
+fi
+vimr_log_test smoketest "smoketest" "$LOG_UNIT"
+if grep -q "\[r:smoketest\] smoke test message" "$LOG_UNIT/smoketest.log" 2>/dev/null; then
+    pass "vimr_log(): writes a tagged line when its channel is enabled"
+else
+    fail "vimr_log() did not write the expected line when its channel was enabled"
+fi
+rm -rf "$LOG_UNIT"
+
 # ----------------------------------------------------------------- toolchain --
 
 # Everything below is optional: what is missing makes an assertion SKIP.
@@ -1794,8 +1826,12 @@ fi
 # w_todo/ is the agent's untracked scratch directory (see its own header);
 # it is not produced by this script or by the plugin, so it is excluded
 # below rather than left to coincidentally never match a leftover pattern.
+# w_log/ is the untracked diagnostic-logging output described in
+# |Vim-R-logging|: the maintainer may leave channels enabled between runs
+# of this script, and that is not a leftover for this scan to flag.
 STRAY="$(find "$REPO" -path "$REPO/.git" -prune -o \
     -path "$REPO/w_todo" -prune -o \
+    -path "$REPO/w_log" -prune -o \
     -path "$REPO/R/objlist" -prune -o \
     \( -name '*.swp' -o -name '*.swo' -o -name 'nvim.log' -o -name '.netrwhist' \
        -o -name '*.tmp.R' -o -name '*.aux' -o -name '*.synctex.gz' \

@@ -987,6 +987,7 @@ the superfluous command `syntax enable`. For details, see:
 |R_remote_compldir|     Mount point of remote cache directory
 |Vim-R-df-view|        Options for visualizing a data.frame or matrix
 |Vim-R-SyncTeX|        Options for SyncTeX
+|R_log_channels|        Per-channel diagnostic logging to w_log/
 
 
 ------------------------------------------------------------------------------
@@ -2607,6 +2608,24 @@ never set, so disabling syntax folding with a 0 does not cost you the note
 folds. Note that Vim's script still creates its fold regions on the mere
 existence of the variable, so a value of 0 pays for them without getting any
 fold out of them; delete the line to avoid that too.
+
+------------------------------------------------------------------------------
+6.41. Diagnostic logging                    *Vim-R-logging* *R_log_channels*
+
+Vim-R, the R side (`vimcom`) and the C helper (`vimrserver`) can each write
+timestamped diagnostic messages to `w_log/<channel>.log`, inside the plugin's
+own directory, for tracking down a bug that spans more than one of them. This
+is off by default: with no channel enabled, nothing is written and nothing
+runs that would not run otherwise.
+
+Enable one or more channels in your |vimrc|:
+>vim
+   let R_log_channels = ['objbr', 'latex']
+<
+`w_log/` is untracked scratch, like the maintainer's own `w_todo/`: it is not
+meant to be committed, and a plugin release always ships with logging off,
+since `R_log_channels` defaults to an empty list. Leaving it enabled only
+affects your own working copy.
 
 
 ==============================================================================

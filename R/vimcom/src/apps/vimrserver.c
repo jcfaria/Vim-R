@@ -136,19 +136,26 @@ struct sockaddr_in servaddr; // Server address structure
 static int sockfd;           // socket file descriptor
 static int connfd;           // Connection file descriptor
 
-#define Debug_NRS_
+/* Diagnostic logging, off unless "vimrserver" is one of the comma-separated
+   channels in VIMR_LOG_CHANNELS (set by Vim-R's R/start_server.vim when
+   g:R_log_channels is non-empty). See init_log(), called once from init(). */
+static int log_enabled = 0;
+static char log_path[512] = "";
+
 __attribute__((format(printf, 1, 2))) static void
 Log(const char *fmt, ...) // Logging function for debugging
 {
-#ifdef Debug_NRS
+    if (!log_enabled)
+        return;
+    FILE *f = fopen(log_path, "a");
+    if (!f)
+        return;
     va_list argptr;
-    FILE *f = fopen("/dev/shm/vimrserver_log", "a");
     va_start(argptr, fmt);
     vfprintf(f, fmt, argptr);
     fprintf(f, "\n");
     va_end(argptr);
     fclose(f);
-#endif
 }
 
 static char *str_cat(char *dest,
@@ -1939,14 +1946,41 @@ static void send_nrs_info(void) {
     fflush(stdout);
 }
 
-static void init(void) {
-#ifdef Debug_NRS
+/* Enables Log() when "vimrserver" is listed in VIMR_LOG_CHANNELS. Unset
+   (the default) means Log() never opens a file. */
+static void init_log(void) {
+    const char *chans = getenv("VIMR_LOG_CHANNELS");
+    const char *dir = getenv("VIMR_LOG_DIR");
+    if (!chans || !dir)
+        return;
+    const char *want = "vimrserver";
+    size_t wantlen = strlen(want);
+    const char *p = chans;
+    while (*p) {
+        const char *comma = strchr(p, ',');
+        size_t partlen = comma ? (size_t)(comma - p) : strlen(p);
+        if (partlen == wantlen && strncmp(p, want, wantlen) == 0) {
+            log_enabled = 1;
+            break;
+        }
+        if (!comma)
+            break;
+        p = comma + 1;
+    }
+    if (!log_enabled)
+        return;
+    snprintf(log_path, sizeof(log_path), "%s/vimrserver.log", dir);
     time_t t;
     time(&t);
-    FILE *f = fopen("/dev/shm/vimrserver_log", "w");
-    fprintf(f, "NSERVER LOG | %s\n\n", ctime(&t));
-    fclose(f);
-#endif
+    FILE *f = fopen(log_path, "a");
+    if (f) {
+        fprintf(f, "NSERVER LOG | %s\n", ctime(&t));
+        fclose(f);
+    }
+}
+
+static void init(void) {
+    init_log();
 
     char envstr[1024];
 

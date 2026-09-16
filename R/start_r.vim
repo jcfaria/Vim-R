@@ -163,6 +163,10 @@ function ReallyStartR(whatr)
     else
         let start_options += ['options(vimcom.debug_r = FALSE)']
     endif
+    if len(g:R_log_channels) > 0
+        let start_options += ['options(vimcom.log_channels = "' . join(g:R_log_channels, ',') . '")']
+        let start_options += ['options(vimcom.log_dir = "' . RLogDir() . '")']
+    endif
     if exists('g:R_setwidth') && g:R_setwidth == 2
         let start_options += ['options(vimcom.setwidth = TRUE)']
     else

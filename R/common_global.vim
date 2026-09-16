@@ -37,6 +37,8 @@ endif
 
 let g:rplugin.debug_info['Time'] = {'common_global.vim': reltime()}
 
+exe "source " . substitute(expand("<sfile>:h:h"), " ", "\\ ", "g") . "/R/log.vim"
+
 "==============================================================================
 " Check if there is more than one copy of Vim-R
 " (e.g. from the Vimballl and from a plugin manager)

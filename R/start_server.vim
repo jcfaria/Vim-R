@@ -234,6 +234,11 @@ function StartNServer()
 
     let $VIMR_LOCAL_TMPDIR = g:rplugin.localtmpdir
 
+    if len(g:R_log_channels) > 0
+        let $VIMR_LOG_CHANNELS = join(g:R_log_channels, ',')
+        let $VIMR_LOG_DIR = RLogDir()
+    endif
+
     " We have to set R's home directory on Window because vimrserver will
     " run R to build the list for omni completion.
     if has('win32')
@@ -250,6 +255,10 @@ function StartNServer()
     unlet $VIMR_OBJBR_ALLNAMES
     unlet $VIMR_RPATH
     unlet $VIMR_LOCAL_TMPDIR
+    if exists('$VIMR_LOG_CHANNELS')
+        unlet $VIMR_LOG_CHANNELS
+        unlet $VIMR_LOG_DIR
+    endif
 endfunction
 
 function ListRLibsFromBuffer()
