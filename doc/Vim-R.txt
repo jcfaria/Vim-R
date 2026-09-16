@@ -5,7 +5,7 @@
 Authors: Jakson A. Aquino   <jalvesaq@gmail.com>
          Jose Claudio Faria <joseclaudio.faria@gmail.com>
 
-Version: 1.0.0
+Version: 1.0.1
 For Vim >= 8.2.84 or Neovim >= 0.6.0
 
  1. Overview                                    |Vim-R-overview|
@@ -2795,6 +2795,19 @@ See also: |R_source|.
 ==============================================================================
 8. News                                                          *Vim-R-news*
 
+1.0.1 (2026-09-15)
+
+ * Fix vim.latexmk_outdir(): a latexmkrc with more than one line setting
+   $out_dir (e.g. a template default plus the user's own override) made
+   the R side treat the file as not setting $out_dir at all, while the
+   Vim side kept the last matching line. Both sides now agree: the last
+   line that sets $out_dir wins. See |R_latexcmd| and |Vim-R-SyncTeX|.
+ * Fix the Object Browser's slot count for an S4/S7 object that has an
+   unset slot: the "[N]" label counted every slot name, including the
+   ones skipped by the fix that stops the listing from aborting on
+   them, so the label could show more slots than were actually listed.
+   It now counts the same slots that are shown.
+
 1.0.0 (2026-09-13)
 
  * Rename Nvim-R as Vim-R, and nvimcom as vimcom.
@@ -2927,8 +2940,7 @@ See also: |R_source|.
  * Keep the Object Browser updating when an S4 object has a slot that is
    not set: ggplot2 4 is the everyday case. The listing used to abort
    inside R's idle task, so objects created afterwards never appeared
-   and nothing was shown to the user. Absent slots are now skipped, and
-   the slot count shown next to the object now matches what is listed.
+   and nothing was shown to the user. Absent slots are now skipped.
  * Print an object with several S3 classes, and a name of the form
    pkg::fun, with <LocalLeader>rp: under R 4.6 the former raised
    "first argument has length > 1" (any tibble triggers it) and the
@@ -2942,10 +2954,8 @@ See also: |R_source|.
    wrong place and the .log was not found, with no error. The search
    is now: beside the document, the current directory, ~/.latexmkrc,
    $XDG_CONFIG_HOME/latexmk/latexmkrc, and ~/.config/latexmk/latexmkrc.
-   The first that exists and sets $out_dir is used, and a file with more
-   than one matching line is read the same way by Vim and by R: the
-   last line that sets $out_dir wins. See |R_latexcmd| and
-   |Vim-R-SyncTeX|.
+   The first that exists and sets $out_dir is used. See |R_latexcmd|
+   and |Vim-R-SyncTeX|.
  * Fold by the levels of the note comments when `r_syntax_folding` is 0:
    whether Vim-R stood aside for syntax folding was decided by the mere
    existence of `g:r_syntax_folding`, and not by its value, so whoever read
