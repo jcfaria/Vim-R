@@ -353,7 +353,7 @@ function GetRArgs(id, base, rkeyword0, listdf, firstobj, pkg, isfarg)
     if a:firstobj != ""
         let msg .= ', firstobj = "' . a:firstobj . '"'
     elseif a:pkg != ""
-        let msg .= ', pkg = ' . a:pkg
+        let msg .= ', lib = ' . a:pkg
     endif
     if a:firstobj != '' && ((a:listdf == 1 && !a:isfarg) || a:listdf == 2)
         let msg .= ', ldf = TRUE'
