@@ -337,39 +337,54 @@ static void vimcom_squo(const char *buf, char *buf2, int bsize) {
  *
  * @param b1 Name to be quoted.
  * @param b2 Destination buffer to the quoted name.
+ * @param bsize Size of b2: every backtick this function adds costs one
+ * byte b1's own length doesn't account for, so b2 can need more room
+ * than b1 even though the source index is bounded at 511.
  */
-static void vimcom_backtick(const char *b1, char *b2) {
+static void vimcom_backtick(const char *b1, char *b2, int bsize) {
     int i = 0, j = 0;
+#define BT_CHECK                                                              \
+    if (j >= bsize - 1) {                                                     \
+        b2[bsize - 1] = 0;                                                    \
+        return;                                                               \
+    }
     while (i < 511 && b1[i] != '$' && b1[i] != '@' && b1[i] != 0) {
         if (b1[i] == '[' && b1[i + 1] == '[') {
+            BT_CHECK
             b2[j] = '[';
             i++;
             j++;
+            BT_CHECK
             b2[j] = '[';
             i++;
             j++;
         } else {
+            BT_CHECK
             b2[j] = '`';
             j++;
         }
         while (i < 511 && b1[i] != '$' && b1[i] != '@' && b1[i] != '[' &&
                b1[i] != 0) {
+            BT_CHECK
             b2[j] = b1[i];
             i++;
             j++;
         }
         if (b1[i - 1] != ']') {
+            BT_CHECK
             b2[j] = '`';
             j++;
         }
         if (b1[i] == 0)
             break;
         if (b1[i] != '[') {
+            BT_CHECK
             b2[j] = b1[i];
             i++;
             j++;
         }
     }
+#undef BT_CHECK
     b2[j] = 0;
 }
 
@@ -567,7 +582,7 @@ static char *vimcom_glbnv_line(SEXP *x, const char *xname, const char *curenv,
         SEXP cmdSexp, cmdexpr;
         ParseStatus status;
         snprintf(buf, 575, "%s%s", curenv, xname);
-        vimcom_backtick(buf, bbuf);
+        vimcom_backtick(buf, bbuf, sizeof(bbuf));
         snprintf(buf, 575, "slotNames(%s)", bbuf);
         PROTECT(cmdSexp = allocVector(STRSXP, 1));
         SET_STRING_ELT(cmdSexp, 0, mkChar(buf));
