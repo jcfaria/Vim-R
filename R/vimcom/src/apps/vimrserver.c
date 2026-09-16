@@ -54,6 +54,14 @@ static char globenv[576];      // Global environment buffer
 static int auto_obbr;          // Auto object browser flag
 static size_t glbnv_buffer_sz; // Global environment buffer size
 static char *glbnv_buffer;     // Global environment buffer
+
+/* glbnv_buffer and pkgList are written by the receive thread (ParseMsg(),
+   via '+G'/'+L' messages from R) and read/walked by the main thread
+   (stdin_loop(), driven by Vim), with no synchronization between them.
+   This mutex serializes the two: ParseMsg() holds it for its whole body,
+   and stdin_loop() holds it for each line it processes. Nothing these two
+   call locks it again, so a plain (non-recursive) mutex is enough. */
+static pthread_mutex_t shared_state_mutex = PTHREAD_MUTEX_INITIALIZER;
 static char *compl_buffer;     // Completion buffer
 static char *finalbuffer;      // Final buffer for message processing
 static unsigned long compl_buffer_size = 32768; // Completion buffer size
@@ -255,6 +263,9 @@ static void ParseMsg(char *b) // Parse the message from R
 {
     Log("ParseMsg(): strlen(b) = %" PRI_SIZET "", strlen(b));
 
+    // Held for the whole function: see shared_state_mutex's comment.
+    pthread_mutex_lock(&shared_state_mutex);
+
     if (*b == '+') {
         b++;
         switch (*b) {
@@ -277,12 +288,12 @@ static void ParseMsg(char *b) // Parse the message from R
             char *args;
             char *id = b;
             char *base = id;
-            while (*base != ';')
+            while (*base != 0 && *base != ';')
                 base++;
             *base = 0;
             base++;
             char *fnm = base;
-            while (*fnm != ';')
+            while (*fnm != 0 && *fnm != ';')
                 fnm++;
             *fnm = 0;
             fnm++;
@@ -298,8 +309,11 @@ static void ParseMsg(char *b) // Parse the message from R
             complete(id, base, fnm, args);
             break;
         }
+        pthread_mutex_unlock(&shared_state_mutex);
         return;
     }
+
+    pthread_mutex_unlock(&shared_state_mutex);
 
     // Send the command to Vim-R
     printf("\x11%" PRI_SIZET "\x11%s\n", strlen(b), b);
@@ -2450,6 +2464,8 @@ void stdin_loop() {
     memset(line, 0, 1024);
 
     while (fgets(line, 1023, stdin)) {
+        // Held for the whole iteration: see shared_state_mutex's comment.
+        pthread_mutex_lock(&shared_state_mutex);
 
         for (unsigned int i = 0; i < strlen(line); i++)
             if (line[i] == '\n' || line[i] == '\r')
@@ -2599,6 +2615,7 @@ void stdin_loop() {
             fflush(stderr);
             break;
         }
+        pthread_mutex_unlock(&shared_state_mutex);
         memset(line, 0, 1024);
     }
 }
