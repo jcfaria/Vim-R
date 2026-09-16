@@ -10,7 +10,7 @@ SyncTeX_readconc <- function(texf, concf) {
     conc <- readLines(concf)
     idx <- 1
     maxidx <- length(conc) + 1
-    while (idx < maxidx && texidx < ntexln && length(grep("Sconcordance", conc[idx])) > 0) {
+    while (idx < maxidx && texidx <= ntexln && length(grep("Sconcordance", conc[idx])) > 0) {
         curline <- sub("\\\\Sconcordance\\{concordance:", "", conc[idx])
         texf <- sub("([^:]*):.*", "\\1", curline)
         rnwf <- sub("[^:]*:([^:]*):.*", "\\1", curline)
@@ -30,12 +30,12 @@ SyncTeX_readconc <- function(texf, concf) {
         lsrnwl[texidx] <- rnwl
         lsrnwf[texidx] <- rnwf
         texidx <- texidx + 1
-        while (ii < maxii && texidx < ntexln) {
+        while (ii < maxii && texidx <= ntexln) {
             ii <- ii + 1
             lnrange <- 1:concl[ii]
             ii <- ii + 1
             for (iii in lnrange) {
-                if (texidx >= ntexln)
+                if (texidx > ntexln)
                     break
                 rnwl <- rnwl + concl[ii]
                 lsrnwl[texidx] <- rnwl
