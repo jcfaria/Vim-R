@@ -1738,6 +1738,13 @@ static const char *write_ob_line(const char *p, const char *bs, char *prfx,
             return p;
 
         int len = strlen(prfx);
+        // newprfx is 96 bytes; neither branch below ever writes to it
+        // faster than it reads from prfx, so clamping len here (rather
+        // than checking inside each loop) is enough to keep both in
+        // bounds. Deep nesting (each level adds a few bytes to prfx) was
+        // able to drive len past 96 with no check at all.
+        if (len > (int)sizeof(newprfx) - 1)
+            len = (int)sizeof(newprfx) - 1;
         if (vimcom_is_utf8) {
             int j = 0, i = 0;
             while (i < len) {
