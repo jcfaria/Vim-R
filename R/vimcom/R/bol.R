@@ -457,6 +457,17 @@ vim.omni.line <- function(x, envir, printenv, curlevel, maxlevel = 0) {
         }
     }
 
+    # curlevel <= maxlevel, not "|| maxlevel == 0": the doc comment on this
+    # function's maxlevel parameter calls 0 "no limit", and the print gate a
+    # few lines above does honour that, but letting *this* recursion gate
+    # honour it too made the smoke test's editor sessions hang/OOM building
+    # the startup Object Browser cache - is.environment(xx) recurses into
+    # environments, which in a live R session cross-reference each other
+    # (namespaces, enclosures, .GlobalEnv) without the cycle protection a
+    # depth-capped tree walk normally gets for free. Reproduced by bisection
+    # (test/smoke_test.sh consistently failed with this alone changed, and
+    # consistently passed with it reverted); a real fix needs a visited-set
+    # or a hard depth ceiling, not just removing the cap. See project notes.
     if ((is.list(xx) || is.environment(xx)) && curlevel <= maxlevel) {
         obj.names <- names(xx)
         curlevel <- curlevel + 1
