@@ -612,12 +612,17 @@ static char *vimcom_glbnv_line(SEXP *x, const char *xname, const char *curenv,
                         nset++;
                 }
             }
-            UNPROTECT(1);
         } else {
             REprintf("vimcom error: invalid value in slotNames(%s%s)\n",
                      curenv, xname);
+            PROTECT(sn = R_NilValue);
         }
-        UNPROTECT(2);
+        // cmdSexp, cmdexpr and sn stay protected past this point: sn is
+        // read again by STRING_ELT() in the slot-listing loop further
+        // below, and Rf_install()/R_do_slot()/the recursive
+        // vimcom_glbnv_line() call there can all trigger a GC. Unprotecting
+        // sn here, before that loop ran, let a collection invalidate it
+        // mid-iteration. UNPROTECT(3) is below, once that loop is done.
         snprintf(buf, 127, " [%d]", nset);
         p = vimcom_strcat(p, buf);
     }
@@ -648,6 +653,9 @@ static char *vimcom_glbnv_line(SEXP *x, const char *xname, const char *curenv,
                     UNPROTECT(1);
                 }
             }
+            // Balances cmdSexp, cmdexpr and sn, all protected together
+            // above for exactly this reason: sn had to survive until here.
+            UNPROTECT(3);
         } else {
             SEXP listNames;
             snprintf(newenv, 575, "%s%s$", curenv, xname);
