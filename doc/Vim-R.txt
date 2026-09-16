@@ -2620,12 +2620,29 @@ runs that would not run otherwise.
 
 Enable one or more channels in your |vimrc|:
 >vim
-   let R_log_channels = ['objbr', 'latex']
+   let R_log_channels = ['vimrserver']
 <
 `w_log/` is untracked scratch, like the maintainer's own `w_todo/`: it is not
 meant to be committed, and a plugin release always ships with logging off,
 since `R_log_channels` defaults to an empty list. Leaving it enabled only
 affects your own working copy.
+
+Every channel is registered, with a one-line description, in
+`g:R_log_known_channels`, so this is the one place to look instead of
+grepping the source for every place that logs. Three commands manage it
+without editing your |vimrc| by hand:
+
+   :RLogChannels           List every known channel, its description, and
+                            whether it is currently in R_log_channels.
+   :RLogEnable {channel}   Add {channel} to R_log_channels. Rejects a name
+                            not in g:R_log_known_channels instead of
+                            silently accepting a typo.
+   :RLogDisable {channel}  Remove {channel} from R_log_channels.
+
+Both commands support tab completion of known channel names. Like every
+other change to R_log_channels, enabling or disabling a channel this way
+only takes effect the next time R (and vimrserver) start, the same as any
+other |g:R_*| option.
 
 
 ==============================================================================

@@ -46,3 +46,63 @@ function RLog(channel, msg)
     let line = strftime('%Y-%m-%dT%H:%M:%S') . ' [vim:' . a:channel . '] ' . a:msg
     call writefile([line], dir . '/' . a:channel . '.log', 'a')
 endfunction
+
+" Central, documented registry of every channel this plugin actually logs
+" to, so a human can discover and manage them with :RLogChannels instead
+" of grepping the source for every RLog()/vimr_log()/Log() call site. Add
+" an entry here whenever a new one is instrumented. "smoketest" is
+" deliberately not listed: it exists only for test/smoke_test.sh's own
+" unit test, driven directly through Rscript, not meant for a human to
+" toggle.
+" Built with one statement per entry so adding a new channel is always a
+" one-line change.
+if !exists('g:R_log_known_channels')
+    let g:R_log_known_channels = {}
+    let g:R_log_known_channels['vimrserver'] = 'vimrserver.c: TCP protocol, thread and job-control internals'
+endif
+
+function RLogChannelComplete(ArgLead, CmdLine, CursorPos)
+    return filter(sort(keys(g:R_log_known_channels)),
+                \ 'v:val =~ "^" . a:ArgLead')
+endfunction
+
+" :RLogChannels -- list every known channel with its description and
+" whether it is currently in g:R_log_channels.
+function RLogListChannels()
+    if empty(g:R_log_known_channels)
+        echo 'No log channels are registered.'
+        return
+    endif
+    for chan in sort(keys(g:R_log_known_channels))
+        let status = RLogEnabled(chan) ? 'on ' : 'off'
+        echo printf('%-12s %s  %s', chan, status, g:R_log_known_channels[chan])
+    endfor
+endfunction
+
+" :RLogEnable {channel} -- add a known channel to g:R_log_channels.
+" Rejects an unlisted name instead of silently accepting a typo.
+function RLogEnableChannel(channel)
+    if !has_key(g:R_log_known_channels, a:channel)
+        call RWarningMsg('Unknown log channel "' . a:channel . '". Known: ' .
+                    \ join(sort(keys(g:R_log_known_channels)), ', '))
+        return
+    endif
+    if index(g:R_log_channels, a:channel) < 0
+        call add(g:R_log_channels, a:channel)
+    endif
+    echo 'Channel "' . a:channel .
+                \ '" enabled. Restart R (and vimrserver) for it to take effect.'
+endfunction
+
+" :RLogDisable {channel} -- remove a channel from g:R_log_channels.
+function RLogDisableChannel(channel)
+    call filter(g:R_log_channels, 'v:val != a:channel')
+    echo 'Channel "' . a:channel .
+                \ '" disabled. Restart R (and vimrserver) for it to take effect.'
+endfunction
+
+command! -nargs=0 RLogChannels call RLogListChannels()
+command! -nargs=1 -complete=customlist,RLogChannelComplete RLogEnable
+            \ call RLogEnableChannel(<q-args>)
+command! -nargs=1 -complete=customlist,RLogChannelComplete RLogDisable
+            \ call RLogDisableChannel(<q-args>)

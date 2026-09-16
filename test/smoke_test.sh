@@ -348,6 +348,42 @@ else
 fi
 rm -rf "$LOG_UNIT"
 
+# :RLogChannels/:RLogEnable/:RLogDisable (R/log.vim) manage g:R_log_channels
+# against the g:R_log_known_channels registry. -N (nocompatible) matters
+# here: without it this and every other multi-line continuation below can
+# silently misbehave in batch mode.
+RLOG_CMD_OUT="$WORK/rlog-cmd-out.txt"
+cat > "$WORK/rlog_cmd_test.vim" <<VIMEOF
+let g:rplugin = {}
+let g:rplugin.home = '$REPO'
+exe "source " . g:rplugin.home . "/R/common_global.vim"
+RLogEnable vimrserver
+call writefile(['enable: ' . string(g:R_log_channels)], '$RLOG_CMD_OUT')
+RLogEnable notachannel
+call writefile(['reject: ' . string(g:R_log_channels)], '$RLOG_CMD_OUT', 'a')
+RLogDisable vimrserver
+call writefile(['disable: ' . string(g:R_log_channels)], '$RLOG_CMD_OUT', 'a')
+qa!
+VIMEOF
+rm -f "$RLOG_CMD_OUT"
+vim -u NONE -N --not-a-term -es -S "$WORK/rlog_cmd_test.vim" </dev/null >/dev/null 2>&1
+if grep -q "^enable: \['vimrserver'\]$" "$RLOG_CMD_OUT" 2>/dev/null; then
+    pass ":RLogEnable adds a known channel to g:R_log_channels"
+else
+    fail ":RLogEnable did not add the channel as expected"
+fi
+if grep -q "^reject: \['vimrserver'\]$" "$RLOG_CMD_OUT" 2>/dev/null; then
+    pass ":RLogEnable rejects a name not in g:R_log_known_channels"
+else
+    fail ":RLogEnable accepted an unknown channel name"
+fi
+if grep -q "^disable: \[\]$" "$RLOG_CMD_OUT" 2>/dev/null; then
+    pass ":RLogDisable removes a channel from g:R_log_channels"
+else
+    fail ":RLogDisable did not remove the channel as expected"
+fi
+rm -f "$WORK/rlog_cmd_test.vim" "$RLOG_CMD_OUT"
+
 # ----------------------------------------------------------------- toolchain --
 
 # Everything below is optional: what is missing makes an assertion SKIP.
