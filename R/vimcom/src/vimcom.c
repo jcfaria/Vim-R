@@ -312,6 +312,11 @@ static void vimcom_squo(const char *buf, char *buf2, int bsize) {
         if (buf[i] == '\'') {
             buf2[j] = '\'';
             j++;
+            // The bounds check above ran before this second write of the
+            // doubled quote, not between the two: a quote landing on the
+            // last in-bounds byte let this write one byte past buf2.
+            if (j >= bsize)
+                break;
             buf2[j] = '\'';
         } else if (buf[i] == 0) {
             buf2[j] = 0;
