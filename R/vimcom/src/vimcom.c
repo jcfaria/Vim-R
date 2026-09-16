@@ -1454,6 +1454,18 @@ SEXP vimcom_Start(SEXP vrb, SEXP anm, SEXP swd, SEXP age, SEXP dbg, SEXP imd,
             REprintf("vimcom: socket creation failed (%d)\n", atoi(nrs_port));
             failure = 1;
         }
+    } else {
+        // VIMR_TMPDIR being set already established that Vim-R did start
+        // this R, so a missing or non-numeric VIMR_PORT here is a real
+        // misconfiguration, not a legitimate standalone-R session: without
+        // this, vimcom_Start() silently returned TRUE with every
+        // downstream feature (Object Browser, omni-completion, SyncTeX
+        // forward search, etc.) dead for the whole session.
+        REprintf("vimcom: VIMR_PORT (\"%s\") is not a valid port; the "
+                 "Object Browser, omni-completion and other Vim-R features "
+                 "will not work this session.\n",
+                 nrs_port);
+        failure = 1;
     }
 
     if (failure == 0) {
