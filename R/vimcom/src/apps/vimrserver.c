@@ -751,6 +751,15 @@ void start_server(void) // Start server and listen for connections
     // Finish immediately with SIGTERM
     signal(SIGTERM, HandleSigTerm);
 
+#ifndef WIN32
+    // A send() after R has already died (crashed, killed, or exited
+    // abnormally) raises SIGPIPE, whose default disposition kills this
+    // whole process. Ignore it instead: the send() then just fails with
+    // EPIPE, which the existing error handling around each call site
+    // already tolerates the same way it tolerates any other send() error.
+    signal(SIGPIPE, SIG_IGN);
+#endif
+
     init_listening();
 
     // Receive messages from TCP and output them to stdout
