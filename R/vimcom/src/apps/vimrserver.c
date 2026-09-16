@@ -471,6 +471,23 @@ static void get_whole_msg(char *b) // Get the whole message from the socket
     ParseMsg(finalbuffer);
 }
 
+// A single recv() is not guaranteed to return all `len` bytes just because
+// the peer sent them together -- TCP is a byte stream, not a message
+// protocol, and a header can legitimately arrive split across two reads
+// (more likely under load or over a remote connection). Retry until the
+// whole header has arrived, or return early on a real disconnect (0) or
+// error (-1).
+static ssize_t recv_full(int fd, char *buf, size_t len) {
+    size_t got = 0;
+    while (got < len) {
+        ssize_t n = recv(fd, buf + got, len - got, 0);
+        if (n <= 0)
+            return n;
+        got += (size_t)n;
+    }
+    return (ssize_t)got;
+}
+
 #ifdef WIN32
 static void
 receive_msg(void *arg) // Thread function to receive messages on Windows
@@ -480,15 +497,16 @@ static void *receive_msg() // Thread function to receive messages on Unix
 {
     size_t blen = VimSecretLen + 9;
     char b[32];
-    size_t rlen;
+    ssize_t rlen;
 
     for (;;) {
         bzero(b, blen);
-        rlen = recv(connfd, b, blen, 0);
-        if (rlen == blen) {
+        rlen = recv_full(connfd, b, blen);
+        if (rlen == (ssize_t)blen) {
             Log("TCP in [%" PRI_SIZET " bytes] (message header): %s", blen, b);
             get_whole_msg(b);
         } else {
+            // Peer closed (0) or a real socket error (-1): reconnect.
             r_conn = 0;
 #ifdef WIN32
             closesocket(sockfd);
@@ -496,15 +514,6 @@ static void *receive_msg() // Thread function to receive messages on Unix
 #else
             close(sockfd);
 #endif
-            if (rlen != -1 && rlen != 0) {
-                fprintf(stderr, "TCP socket -1: restarting...\n");
-                fprintf(stderr,
-                        "Wrong TCP data length: %" PRI_SIZET " x %" PRI_SIZET
-                        "\n",
-                        blen, rlen);
-                fflush(stderr);
-                break;
-            }
             init_listening();
         }
     }
