@@ -533,7 +533,15 @@ static char *vimcom_glbnv_line(SEXP *x, const char *xname, const char *curenv,
     // Specific class of object, if any
     PROTECT(txt = getAttrib(*x, R_ClassSymbol));
     if (!isNull(txt)) {
-        p = vimcom_strcat(p, CHAR(STRING_ELT(txt, 0)));
+        const char *classname = CHAR(STRING_ELT(txt, 0));
+        // Unlike every other field appended in this function, a class
+        // name has no length cap (class(x) <- <any string>), so the
+        // periodic fill-level check above isn't guaranteed to have left
+        // enough room for one that happens to be unusually long.
+        while ((unsigned long)(p - glbnvbuf2) + strlen(classname) + 1 >
+               glbnvbufsize)
+            p = vimcom_grow_buffers();
+        p = vimcom_strcat(p, classname);
     }
     UNPROTECT(1);
 
