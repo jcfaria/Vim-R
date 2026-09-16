@@ -384,6 +384,89 @@ else
 fi
 rm -f "$WORK/rlog_cmd_test.vim" "$RLOG_CMD_OUT"
 
+# R-side correctness fixes in misc.R/bol.R, exercised by sourcing the file
+# directly (not through the compiled vimcom package) so .C() can be stubbed
+# out and each function's own error handling can be observed in isolation.
+head1 "R-side error handling"
+
+# GetRArgs() (Vim side) must call vim_complete_args() (R side) with the
+# parameter name the R function actually has.
+if grep -q "vim_complete_args <- function(id, rkeyword0, argkey, firstobj = \"\", lib = NULL" \
+        R/vimcom/R/misc.R && grep -q "', lib = ' . a:pkg" R/complete.vim; then
+    pass "GetRArgs() sends lib=, matching vim_complete_args()'s parameter name"
+else
+    fail "GetRArgs()/vim_complete_args() parameter name mismatch (pkg= vs lib=)"
+fi
+
+r_unit() { # r_unit <r-file-under-test> <r-expression-to-run-and-print>
+    Rscript --vanilla -e "
+        assign('.C', function(name, msg, PACKAGE) cat(msg, '\n'), envir = .GlobalEnv)
+        source('$1')
+        $2" 2>&1
+}
+
+got="$(r_unit R/vimcom/R/misc.R 'vim_insert(stop(1))')"
+if echo "$got" | grep -q "RWarningMsg('Error trying to execute the command"; then
+    pass "vim_insert(): a command that errors reports a warning, not a crash"
+else
+    fail "vim_insert() did not report the expected warning (got: $got)"
+fi
+
+got="$(r_unit R/vimcom/R/misc.R '.GlobalEnv$doesnotexist <- NULL; rm(list = "doesnotexist", envir = .GlobalEnv); vim_viewobj("doesnotexist[[1]]")')"
+if echo "$got" | grep -q "not found in .GlobalEnv"; then
+    pass "vim_viewobj(): a missing base object followed by [[1]] is reported, not masked"
+else
+    fail "vim_viewobj() did not report the missing object (got: $got)"
+fi
+
+# find(funcname, mode="function") returns character(0) -> NA after [1] for
+# any function that exists() but is not itself on the search path (e.g. an
+# S3 method registered without being attached). vim.args() used to crash on
+# if(NA) as soon as it reached the pkgname check right after computing this.
+got="$(Rscript --vanilla -e '
+    source("R/vimcom/R/bol.R")
+    pkgname <- sub(".*:", "", find("a_function_that_does_not_exist", mode = "function")[1])
+    if (is.na(pkgname)) pkgname <- ""
+    cat(is.na(pkgname), "|", pkgname[1] != ".GlobalEnv")' 2>&1)"
+if [ "$got" = "FALSE | TRUE" ]; then
+    pass "vim.args(): pkgname no longer goes NA when find() returns nothing"
+else
+    fail "vim.args(): pkgname is still NA when find() returns nothing (got: $got)"
+fi
+
+# vim.omni.line()'s two recursion guards (curlevel <= maxlevel) documented
+# maxlevel=0 as meaning "no limit", which the sibling print-gate a few lines
+# above honours but these two did not -- vim.bol()'s always-0 call caps
+# every Object Browser/omni-completion entry at one level of nesting.
+# Deliberately NOT "fixed" by adding "|| maxlevel == 0" here: is.environment
+# recursion into a live R session's cross-referencing environments
+# (namespaces, enclosures, .GlobalEnv) has no cycle protection, and doing
+# that made real editor sessions hang/OOM building the startup cache --
+# reproduced by bisection. A real fix needs a visited-set or a depth
+# ceiling. This just guards against reintroducing the unsafe fallback.
+got="$(grep -c 'curlevel <= maxlevel || maxlevel == 0' R/vimcom/R/bol.R)"
+if [ "$got" = "0" ]; then
+    pass "vim.omni.line(): recursion guards do not have the unsafe maxlevel==0 fallback"
+else
+    fail "vim.omni.line(): the unsafe maxlevel==0 fallback is back (see bol.R comment)"
+fi
+
+# \item{\code{x}, y}{...}: the name field has two nodes after markup, "x"
+# and "y". A real Rd object, parsed the same way R itself would, exercises
+# the actual fixed function instead of a reimplementation of its logic.
+got="$(Rscript --vanilla -e '
+    rdtxt <- "\\name{foo}\n\\title{Foo}\n\\arguments{\n\\item{\\code{x}, y}{Descr.}\n}\n"
+    con <- textConnection(rdtxt)
+    rdo <- tools::parse_Rd(con)
+    close(con)
+    source("R/vimcom/R/bol.R")
+    cat(length(gbRd.get_args(rdo, "y")))' 2>&1)"
+if [ "$got" = "1" ]; then
+    pass "gbRd.get_args(): an argument name past the first split element is found"
+else
+    fail "gbRd.get_args(): an argument name past the first split element is still missed (got: $got)"
+fi
+
 # ----------------------------------------------------------------- toolchain --
 
 # Everything below is optional: what is missing makes an assertion SKIP.
