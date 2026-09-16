@@ -2086,6 +2086,11 @@ static void init(void) {
     strncpy(VimSecret, getenv("VIMR_SECRET"), 127);
     VimSecretLen = strlen(VimSecret);
 
+    if (!getenv("VIMR_COMPLDIR") || !getenv("VIMR_TMPDIR")) {
+        fprintf(stderr, "VIMR_COMPLDIR or VIMR_TMPDIR not found\n");
+        fflush(stderr);
+        exit(1);
+    }
     strncpy(compldir, getenv("VIMR_COMPLDIR"), 255);
     strncpy(tmpdir, getenv("VIMR_TMPDIR"), 255);
     if (getenv("VIMR_LOCAL_TMPDIR")) {
