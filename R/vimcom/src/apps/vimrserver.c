@@ -1818,6 +1818,13 @@ void hi_glbenv_fun(void) {
             s++;
         s++;
         if (*s == '\003') {
+            // Avoid buffer overflow: this loop can append one name per
+            // function in .GlobalEnv, and unlike its callers elsewhere in
+            // this file it never checked compl_buffer's remaining room.
+            unsigned long nsz = strlen(g) + 2 + 1024 + (p - compl_buffer);
+            if (compl_buffer_size < nsz)
+                p = grow_buffer(&compl_buffer, &compl_buffer_size,
+                                nsz - compl_buffer_size);
             p = str_cat(p, g);
             p = str_cat(p, " ");
         }
@@ -2227,9 +2234,11 @@ void completion_info(const char *wrd, const char *pkg) {
             }
 
             // Avoid buffer overflow if the information is bigger than
-            // compl_buffer.
-            nsz = strlen(f[4]) + strlen(f[5]) + strlen(f[6]) + 1024 +
-                  (p - compl_buffer);
+            // compl_buffer. Every field appended below must be counted
+            // here, not only the three longest ones: wrd and f[3] are
+            // appended too, and were missing from this count.
+            nsz = strlen(f[3]) + strlen(f[4]) + strlen(f[5]) + strlen(f[6]) +
+                  strlen(wrd) + 1024 + (p - compl_buffer);
             if (compl_buffer_size < nsz)
                 p = grow_buffer(&compl_buffer, &compl_buffer_size,
                                 nsz - compl_buffer_size);
@@ -2296,8 +2305,10 @@ char *parse_omnils(const char *s, const char *base, const char *pkg, char *p) {
                 continue;
 
             // Avoid buffer overflow if the information is bigger than
-            // compl_buffer.
-            nsz = strlen(f[0]) + 1024 + (p - compl_buffer);
+            // compl_buffer. f[3] is appended twice below ('menu' and
+            // 'pkg'), and f[2] and pkg were missing from this count.
+            nsz = strlen(f[0]) + strlen(f[2]) + strlen(f[3]) * 2 +
+                  (pkg ? strlen(pkg) + 2 : 0) + 1024 + (p - compl_buffer);
             if (compl_buffer_size < nsz)
                 p = grow_buffer(&compl_buffer, &compl_buffer_size,
                                 nsz - compl_buffer_size);
@@ -2394,6 +2405,14 @@ char *complete_args(char *p, char *funcnm) {
                             i--;
                     }
                     s++;
+                    // Avoid buffer overflow: a function with a long
+                    // argument signature (s) had nothing checking this
+                    // append against compl_buffer's remaining room.
+                    unsigned long nsz = strlen(pd->name) + strlen(funcnm) +
+                                        strlen(s) + 1024 + (p - compl_buffer);
+                    if (compl_buffer_size < nsz)
+                        p = grow_buffer(&compl_buffer, &compl_buffer_size,
+                                        nsz - compl_buffer_size);
                     p = str_cat(p, "{'pkg': '");
                     p = str_cat(p, pd->name);
                     p = str_cat(p, "', 'fnm': '");
