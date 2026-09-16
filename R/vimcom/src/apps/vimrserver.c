@@ -194,11 +194,14 @@ static char *grow_buffer(char **b, unsigned long *sz,
 {
     Log("grow_buffer(%lu, %lu) [%lu, %lu]", *sz, inc, compl_buffer_size,
         fb_size);
-    *sz += inc;
-    char *tmp = calloc(*sz, sizeof(char));
+    unsigned long newsz = *sz + inc;
+    char *tmp = calloc(newsz, sizeof(char));
+    if (!tmp) // Out of memory: leave *b and *sz untouched, caller must check
+        return NULL;
     strcpy(tmp, *b);
     free(*b);
     *b = tmp;
+    *sz = newsz;
     return tmp;
 }
 
@@ -381,7 +384,7 @@ static void get_whole_msg(char *b) // Get the whole message from the socket
     Log("get_whole_msg()");
     char *p;
     char tmp[1];
-    int msg_size;
+    long msg_size;
 
     if (strstr(b, VimSecret) != b) {
         fprintf(stderr, "Strange string received {%s}: \"%s\"\n", VimSecret, b);
@@ -390,39 +393,64 @@ static void get_whole_msg(char *b) // Get the whole message from the socket
     }
     p = b + VimSecretLen;
 
-    // Get the message size
+    // Get the message size (used only to size-hint the initial allocation;
+    // the receive loop below grows the buffer to fit whatever actually
+    // arrives, so a wrong or malformed value here cannot overflow it).
     p[9] = 0;
-    msg_size = atoi(p);
+    msg_size = atol(p);
+    if (msg_size < 0)
+        msg_size = 0;
     p += 10;
 
     // Allocate enough memory to the final buffer
     if (finalbuffer) {
         memset(finalbuffer, 0, fb_size);
-        if (msg_size > fb_size)
-            finalbuffer =
-                grow_buffer(&finalbuffer, &fb_size, msg_size - fb_size + 1024);
+        if (msg_size > (long)fb_size &&
+            !grow_buffer(&finalbuffer, &fb_size,
+                         msg_size - fb_size + 1024)) {
+            fprintf(stderr, "get_whole_msg: out of memory\n");
+            fflush(stderr);
+            return;
+        }
     } else {
-        if (msg_size > fb_size)
+        if (msg_size > (long)fb_size)
             fb_size = msg_size + 1024;
         finalbuffer = calloc(fb_size, sizeof(char));
+        if (!finalbuffer) {
+            fprintf(stderr, "get_whole_msg: out of memory\n");
+            fflush(stderr);
+            fb_size = 0;
+            return;
+        }
     }
 
     p = finalbuffer;
+    unsigned long used = 0;
     for (;;) {
-        if ((recv(connfd, tmp, 1, 0) == 1))
-            *p = *tmp;
-        else
+        if (recv(connfd, tmp, 1, 0) != 1)
             break;
+        // Always keep room for the trailing NUL below, no matter what
+        // msg_size claimed: grow rather than overrun finalbuffer.
+        if (used + 1 >= fb_size) {
+            if (!grow_buffer(&finalbuffer, &fb_size, fb_size + 1024)) {
+                fprintf(stderr, "get_whole_msg: out of memory growing buffer\n");
+                fflush(stderr);
+                return;
+            }
+            p = finalbuffer + used;
+        }
+        *p = *tmp;
         if (*p == '\x11')
             break;
         p++;
+        used++;
     }
     *p = 0;
 
     // FIXME: Delete this check when the code proved to be reliable
-    if (strlen(finalbuffer) != msg_size) {
-        fprintf(stderr, "Divergent TCP message size: %" PRI_SIZET " x %d\n",
-                strlen(p), msg_size);
+    if ((long)strlen(finalbuffer) != msg_size) {
+        fprintf(stderr, "Divergent TCP message size: %" PRI_SIZET " x %ld\n",
+                strlen(finalbuffer), msg_size);
         fflush(stderr);
     }
 
