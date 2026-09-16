@@ -920,8 +920,10 @@ static void vimcom_checklibs(void) {
     PROTECT(a = eval(lang1(install("search")), R_GlobalEnv));
 
     int newnlibs = Rf_length(a);
-    if (nlibs == newnlibs)
+    if (nlibs == newnlibs) {
+        UNPROTECT(1); // balances the PROTECT(a = ...) above
         return;
+    }
 
     SEXP l, cmdSexp, cmdexpr, ans;
     const char *libname;
