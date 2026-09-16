@@ -66,7 +66,10 @@ vim.help <- function(topic, w, firstobj, package) {
     }
 
     if ("devtools" %in% loadedNamespaces()) {
-        ret <- suppressMessages(try(devtools::dev_help(topic), silent = TRUE))
+        # devtools >= 2.5 no longer exports dev_help() itself (confirmed on
+        # 2.5.2); the real implementation moved to pkgload, which devtools
+        # depends on and loads regardless.
+        ret <- suppressMessages(try(pkgload::dev_help(topic), silent = TRUE))
 
         if (!inherits(ret, "try-error")) {
             return(invisible(NULL))
