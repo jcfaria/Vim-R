@@ -77,14 +77,16 @@ vim_viewobj <- function(oname, fenc = "", nrows = NULL, howto = "tabnew", R_df_v
         oname_split <- unlist(strsplit(oname_split, "[[", fixed = TRUE))
         oname_split <- unlist(strsplit(oname_split, "]]", fixed = TRUE))
         ok <- try(o <- get(oname_split[[1]], envir = .GlobalEnv), silent = TRUE)
-        if (length(oname_split) > 1) {
+        if (length(oname_split) > 1 && !inherits(ok, "try-error")) {
             for (i in 2:length(oname_split)) {
-                oname_integer <- suppressWarnings(o <- as.integer(oname_split[[i]]))
+                oname_integer <- suppressWarnings(as.integer(oname_split[[i]]))
                 if (is.na(oname_integer)) {
-                    ok <- try(o <- ok[[oname_split[[i]]]], silent = TRUE)
+                    ok <- try(o <- o[[oname_split[[i]]]], silent = TRUE)
                 } else {
-                    ok <- try(o <- ok[[oname_integer]], silent = TRUE)
+                    ok <- try(o <- o[[oname_integer]], silent = TRUE)
                 }
+                if (inherits(ok, "try-error"))
+                    break
             }
         }
         if (inherits(ok, "try-error")) {
@@ -198,7 +200,8 @@ vim_format <- function(l1, l2, wco, sw, txt) {
 
     txt <- strsplit(gsub("\x13", "'", txt), "\x14")[[1]]
     if (getOption("vimcom.formatfun") == "tidy_source") {
-        ok <- formatR::tidy_source(text = txt, width.cutoff = wco, output = FALSE)
+        ok <- try(formatR::tidy_source(text = txt, width.cutoff = wco, output = FALSE),
+                  silent = TRUE)
         if (inherits(ok, "try-error")) {
             .C("vimcom_msg_to_vim",
                "call RWarningMsg('Error trying to execute the function formatR::tidy_source()')",
@@ -228,10 +231,14 @@ vim_format <- function(l1, l2, wco, sw, txt) {
 #' @param cmd Command to be executed.
 #' @param howto How Vim-R should insert the result.
 vim_insert <- function(cmd, howto = "tabnew") {
-    try(o <- capture.output(cmd))
+    # Captured before evaluation: once capture.output(cmd) below has failed,
+    # referencing the cmd promise again to report it raises "restarting
+    # interrupted promise evaluation" instead of the intended warning.
+    cmdtxt <- deparse(substitute(cmd))
+    o <- try(capture.output(cmd), silent = TRUE)
     if (inherits(o, "try-error")) {
         .C("vimcom_msg_to_vim",
-           paste0("call RWarningMsg('Error trying to execute the command \"", cmd, "\"')"),
+           paste0("call RWarningMsg('Error trying to execute the command \"", cmdtxt, "\"')"),
            PACKAGE = "vimcom")
     } else {
         o <- paste0(o, collapse = "\x14")
@@ -273,9 +280,9 @@ vim.get.summary <- function(obj, wdth) {
 
     owd <- getOption("width")
     options(width = wdth)
+    on.exit(options(width = owd))
     sobj <- try(summary(obj), silent = TRUE)
     txt <- capture.output(print(sobj))
-    options(width = owd)
 
     txt <- paste0(txt, collapse = "\n")
     txt <- gsub("'", "\x13", gsub("\n", "\x14", txt))
@@ -314,11 +321,11 @@ vim.plot <- function(x) {
     xname <- deparse(substitute(x))
     if (length(grep("numeric", class(x))) > 0 || length(grep("integer", class(x))) > 0) {
         oldpar <- par(no.readonly = TRUE)
+        on.exit(par(oldpar))
         par(mfrow = c(2, 1))
         hist(x, col = "lightgray", main = paste("Histogram of", xname), xlab = xname)
         boxplot(x, main = paste("Boxplot of", xname),
                 col = "lightgray", horizontal = TRUE)
-        par(oldpar)
     } else {
         plot(x)
     }
