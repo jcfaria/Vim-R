@@ -1405,6 +1405,13 @@ static void finish_bol() {
             pkg->built = 1;
         if (pkg->built && !pkg->omnils)
             load_pkg_data(pkg);
+        // A package submitted to this build (to_build == 1) whose file
+        // still isn't there failed to build. Without this, to_build would
+        // stay set forever and build_omnils() would never retry it, so
+        // this one package's completion and Object Browser entries would
+        // silently and permanently stay empty for the rest of the session.
+        if (pkg->to_build && !pkg->built)
+            pkg->to_build = 0;
         pkg = pkg->next;
     }
 
