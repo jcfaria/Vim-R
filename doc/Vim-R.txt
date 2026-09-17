@@ -5,7 +5,7 @@
 Authors: Jakson A. Aquino   <jalvesaq@gmail.com>
          Jose Claudio Faria <joseclaudio.faria@gmail.com>
 
-Version: 1.0.1
+Version: 1.0.2
 For Vim >= 8.2.84 or Neovim >= 0.6.0
 
  1. Overview                                    |Vim-R-overview|
@@ -2830,6 +2830,42 @@ See also: |R_source|.
 
 ==============================================================================
 8. News                                                          *Vim-R-news*
+
+1.0.2 (2026-09-16)
+
+ * Add :RLogChannels to list every known log channel with its current on/off
+   state, and :RLogEnable/:RLogDisable (with tab completion) to add or remove
+   one from g:R_log_channels by name instead of editing the source.
+   :RLogEnable now rejects an unlisted channel name instead of silently
+   accepting a typo. See |Vim-R-logging|.
+ * Fix argument completion for namespace-qualified calls such as
+   stats::rnorm(): GetRArgs() sent the package name as pkg=, but
+   vim_complete_args() only accepts lib=, so R rejected the call with "unused
+   argument" and no completions were shown.
+ * Fix several error-handling defects in misc.R that could abort the session
+   instead of showing a warning: a failed :Rinsert capture crashed with
+   "object 'o' not found"; :Rformat on incomplete code threw an uncaught parse
+   error when only formatR was installed; a broken chained object lookup could
+   surface a raw error instead of a clean "not found" message; and
+   vim.get.summary()/vim.plot() could leave the console width or graphics
+   layout stuck after a throwing print()/hist() call.
+ * Fix several error-handling defects in bol.R that could abort the
+   argument-completion cache build: a multi-node Rd \item name field silently
+   dropped later arguments; an S3 method not on the search path crashed
+   vim.args() instead of returning no completions; a single-row alias table
+   crashed GetFunDescription(); and a package whose require() itself threw
+   aborted the whole build instead of just being skipped.
+ * Fix vim.help()'s devtools fallback: devtools >= 2.5 no longer exports
+   dev_help(), so requesting help (\rh) with devtools loaded silently failed.
+   The fallback now calls pkgload::dev_help() directly.
+ * Fix an off-by-one in SyncTeX_readconc() that left the concordance entry for
+   a .tex file's last line unset: a LaTeX/pdfTeX error reported on that line
+   showed the literal placeholder "[NA: NA]" instead of the real source file
+   and line. See |Vim-R-SyncTeX|.
+ * Shell-quote texf in the bibtex/re-latex system() calls: an .Rnw file name
+   containing a space was split into two shell arguments, so bibtex failed or
+   ran on the wrong file even though the immediately preceding compile step,
+   which already quotes texf, worked.
 
 1.0.1 (2026-09-15)
 
