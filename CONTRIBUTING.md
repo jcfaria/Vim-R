@@ -1,8 +1,10 @@
 # Contributing to Vim-R
 
 Vim-R improves Vim's and Neovim's support for editing R code. This file
-covers how to build, test and commit changes — for human contributors and
-for AI coding agents working on this repository alike.
+covers the project's build, test and commit conventions. If you are an AI
+agent maintaining this repository, also read `CODE_OF_CONDUCT_AI.md` — it
+governs how you operate here; this file governs the project's technical
+conventions, for any contributor.
 
 ## Getting started
 
@@ -25,45 +27,26 @@ on your system.
 
 - `main` only moves when the maintainer has reviewed and blessed the
   change. It is never pushed to directly.
-- `work` is where day-to-day development happens, including by an AI
-  assistant: commit there freely.
+- `work` is where day-to-day development happens: commit there freely.
 - For a change risky enough that it shouldn't land on `work` unproven
   (e.g. touching threading, memory safety, or the network protocol in
   `R/vimcom/src/`), branch a temporary `work_xxx` off `work` and advance
   the work there. Once it succeeds, merge `work_xxx` into `work` — but
   keep `work_xxx` itself alive and mirrored to the remote as a precaution,
   rather than deleting it right away. Only once `work` has actually been
-  consolidated into `main` (a `CP`/`CMPW` push, see below) is `work_xxx`
-  pruned, local and remote.
-- Never rewrite history that has already been pushed: no `--amend`,
-  `rebase`, or `reset --hard` on a published commit, and no `--force`
-  unless explicitly instructed. If two authors' commits are mixed in a
-  range (e.g. cherry-picks from a fork), their authorship must survive
-  untouched.
-- Only one writer — human or agent — commits to a given branch at a time.
-  Check `git status` before starting; unexpected local changes mean someone
-  else is mid-flight.
-
-## Pushing (for an AI assistant working here)
-
-Never `git push` — to any remote, on any branch — unless the maintainer
-writes one of these, in that same message:
-
-- **`CP`** — commit whatever is staged on `work`, then push `work` only.
-  `main` is not touched.
-- **`CMPW`** — commit on `work`, merge `work` into `main`, push both
-  branches, then switch back to `work` so day-to-day development continues
-  from there. This is the token that moves `main`.
-- **"podes enviar"** — plain-language equivalent of `CP`.
-
-None of the three authorizes `--force`, tags, or pushing to a fork's own
-remote. Absent one of these tokens in the message, prepare the commit and
-say so, but do not push to see what happens.
+  consolidated into `main` is `work_xxx` pruned, local and remote.
+- History on `main` and `work` is not rewritten once pushed — no
+  `--amend`, `rebase`, `reset --hard`, or `--force` on a published commit
+  — without the maintainer's explicit sign-off on that specific rewrite.
+  If two authors' commits are mixed in a range (e.g. cherry-picks from a
+  fork), their authorship must survive untouched.
+- Only one writer commits to a given branch at a time. Check `git status`
+  before starting; unexpected local changes mean someone else is
+  mid-flight.
 
 ## Building and testing
 
-Before opening a pull request — and, for an AI assistant, before every
-commit — run the end-to-end smoke test:
+Before opening a pull request, run the end-to-end smoke test:
 
 ```sh
 ./test/smoke_test.sh          # no arguments, ~60 s
@@ -103,16 +86,3 @@ need to be per-commit.
   go stale silently. A real minimum the code enforces (Vim `8.2.84`,
   Neovim `0.6.0`, R `4.0.0`, Tmux `3.0`) is the exception — keep those
   pinned, and change the code and the docs together if one changes.
-
-## Notes for whoever (or whatever) picks this up next
-
-- Replies to the maintainer are expected in Brazilian Portuguese (pt-BR).
-- Running tests, builds and local commits does not need per-action
-  confirmation; only pushing does (see above). Repeated confirmation
-  requests for those are unwelcome.
-- Prefer many small local commits over one large one.
-- Report what was *verified by running* separately from what is *inferred
-  from reading the code*. If something can't be reproduced, say so rather
-  than naming a cause that wasn't checked.
-- The maintainer notices sloppy or inconsistent wording in the
-  documentation and expects it fixed, not just the code.
