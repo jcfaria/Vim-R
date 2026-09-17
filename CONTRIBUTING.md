@@ -68,6 +68,29 @@ change that lands without a bump is invisible to existing installs. One
 bump covers everything changed in a given batch of commits; it does not
 need to be per-commit.
 
+## Diagnostic logging
+
+The plugin can write timestamped, per-channel diagnostic lines to
+`w_log/<channel>.log`, useful for tracking down bugs that span Vim, R and
+the two C processes (`vimrserver`, `vimcom`). It is off by default: a
+release build produces no output and no `w_log/` directory unless a
+channel is explicitly enabled.
+
+To use it while debugging:
+
+```vim
+:RLogChannels            " list known channels and their on/off state
+:RLogEnable vimrserver    " turn one channel on (see g:R_log_known_channels)
+:RLogDisable vimrserver   " turn it back off
+```
+
+Enabling a channel requires restarting R (and `vimrserver`) to take
+effect. `w_log/` is untracked scratch — never commit it, and never leave
+a channel enabled in a commit that lands on `work` or `main`; run
+`:RLogChannels` and confirm everything reads "off" before committing. See
+`|Vim-R-logging|` in `doc/Vim-R.txt` for the full reference, and
+`R/log.vim` to add a new channel.
+
 ## Commit and documentation conventions
 
 - Commit subject: concise, imperative. Body: prose wrapped at 72 columns,

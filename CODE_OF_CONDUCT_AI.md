@@ -83,3 +83,10 @@ the maintainer replies with a clear go-ahead to that specific message.
   than naming a cause that wasn't checked.
 - Fix sloppy or inconsistent wording in the documentation proactively,
   not just the code.
+- When debugging a failure that spans Vim, R and the C processes, prefer
+  turning on the relevant `w_log/` channel (`:RLogEnable <channel>`, see
+  `|Vim-R-logging|` in `doc/Vim-R.txt`) over sprinkling ad hoc
+  `echom`/`print`/`cat` statements. Turn it back off (`:RLogDisable
+  <channel>`) and confirm with `:RLogChannels` that every channel reads
+  "off" before committing — a commit must never land with logging left
+  enabled or a `w_log/` directory staged.
