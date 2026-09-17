@@ -21,13 +21,13 @@ For Vim >= 8.2.84 or Neovim >= 0.6.0
 ==============================================================================
 1. Overview                                                  *Vim-R-overview*
 
-This plugin improves Vim's and Neovim's support for editing R code. It is
-available at:
+This plugin improves Vim's and Neovim's support for editing R code. It emits
+warnings rather than failing silently when it encounters something it was
+not programmed to handle. Source:
 
     https://github.com/jcfaria/Vim-R
 
-The plugin should emit useful warnings if you do things it was not programmed
-to deal with. Please report critical bugs to:
+Report critical bugs at:
 
     https://github.com/jcfaria/Vim-R/issues
 
@@ -83,7 +83,7 @@ The installation process is described in four sections:
 ------------------------------------------------------------------------------
 3.1. Installation of dependencies
 
-Before installing the plugin, you should install its dependencies:
+Before installing the plugin, install its dependencies.
 
 Main dependencies:
 
@@ -151,9 +151,8 @@ If running Gnome Shell on Wayland, you may also want to install the extension
 displaying the PDF file generated from Rnoweb, Rmd or Quarto documents.
 
 
-Suggestions for bibliographic completion from Zotero:
-
-For RMarkdown (`.Rmd`) and Quarto (`.qmd`) documents:
+Suggestions for bibliographic completion from Zotero, for RMarkdown (`.Rmd`)
+and Quarto (`.qmd`) documents:
 
    - https://github.com/jalvesaq/zotcite
 
@@ -187,8 +186,8 @@ than those mentioned above; however, see:
 
 If the plugin is active, pressing <LocalLeader>rf should start R.
 
-Did you see warning messages but they disappeared before you had time to read
-them? Type the command |:messages| in Normal mode to see them again.
+If warning messages disappear before you can read them, run |:messages| in
+Normal mode to see them again.
 
 Run the command `:RDebugInfo` which will show information useful to fix some
 common issues.
@@ -223,13 +222,11 @@ Try quitting both R and Vim and starting them again.
 
 If you still see the message "The package vimcom wasn't loaded yet" after
 starting R, then Vim-R could not induce R to load vimcom. Vim-R sets the
-environment variable `R_DEFAULT_PACKAGES` before starting R. If the variable
-already exists, the string ",vimcom" is appended to it. However, if you set
-the option `defaultPackages` in your .Rprofile or in a .Rprofile in the
-current directory, the environment variable will be overridden. Thus, if you
-have to set the option `defaultPackages`, you should include "vimcom" among
-the packages to be loaded. You might want to include "vimcom" only if R was
-started by Vim-R, as in the example below:
+environment variable `R_DEFAULT_PACKAGES` before starting R, appending
+",vimcom" if the variable already exists. However, setting the option
+`defaultPackages` in a .Rprofile overrides that environment variable, so you
+must include "vimcom" among the packages listed there — ideally only when R
+was started by Vim-R, as in the example below:
 >r
    if(Sys.getenv("VIMR_TMPDIR") == ""){
        options(defaultPackages = c("utils", "grDevices", "graphics", "stats", "methods"))
@@ -412,27 +409,22 @@ Help (R)                                            :Rhelp
 Please see |Vim-R-key-bindings| to learn how to customize the key bindings
 without editing the plugin directly.
 
-The plugin commands that send code to R Console are the most commonly used. If
-the code to be sent to R has a single line, it is sent directly to R Console.
-If it has more than one line (a selection of lines, a block of lines between
-two marks, a paragraph, etc.), the lines are written to a file and the plugin
-sends to R the command to source the file. To send to R Console the line
-currently under the cursor, you should type <LocalLeader>d. If you want to see
-what lines are being sourced when sending a selection of lines, you can use
-either <LocalLeader>se or <LocalLeader>sa instead of <LocalLeader>ss. The
-<LocalLeader>m{motion} command sends the lines from the motion command that
-follows <LocalLeader>m, e.g. <LocalLeader>m} (from the current line to the end
-of paragraph) or <LocalLeader>m3j (the next 3 lines including the current
-line).
+The plugin commands that send code to R are the most commonly used. A single
+line is sent directly to the R Console; multiple lines (a selection, a block
+between marks, a paragraph, etc.) are written to a file that the plugin
+sources instead. To send the line under the cursor, type <LocalLeader>d. To
+see the lines being sourced when sending a selection, use <LocalLeader>se or
+<LocalLeader>sa instead of <LocalLeader>ss. <LocalLeader>m{motion} sends the
+lines spanned by the motion that follows it, e.g. <LocalLeader>m} (to the end
+of the paragraph) or <LocalLeader>m3j (the next 3 lines, including the current
+one).
 
-If the cursor is between manually inserted marks, the plugin will send the
-lines between them to R if you press <LocalLeader>bb. If the cursor is above
-the first mark, the plugin will send from the beginning of the file to the
-mark. If the cursor is below the last mark, the plugin will send from the mark
-to the end of the file. The mark above the cursor is included and the mark
-below is excluded from the block to be sent to R. To create a mark, press
-m<letter> in Normal mode (see |mark|). For example, consider the following
-code (with line numbers):
+<LocalLeader>bb sends the block of lines between two manually inserted marks.
+If the cursor is above the first mark, it sends from the start of the file to
+that mark; if below the last mark, from the mark to the end of the file. The
+mark above the cursor is included, the mark below is excluded. To create a
+mark, press m<letter> in Normal mode (see |mark|). For example, consider the
+following code (with line numbers):
 >
    1
    2  x <- 3
@@ -458,37 +450,29 @@ The command <LocalLeader>o runs in the background the R command `print(line)`,
 where `line` is the line under the cursor, and adds the output as commented
 lines to the source code.
 
-If the cursor is over the header of an R chunk with the `child` option (in an
-Rnoweb, RMarkdown, Quarto or RreStructuredText document), and you use one of
-the commands that send a single line of code to R, then the plugin will send
-to R the command to knit the child document.
+If the cursor is on the header of an R chunk with the `child` option (Rnoweb,
+RMarkdown, Quarto or RreStructuredText), sending a single line from it makes
+the plugin knit the child document instead.
 
-Before performing the commands that send, sweave or knit the current buffer,
-Vim will save the buffer if it has any pending changes. After
-<LocalLeader>ao, Vim will run "R CMD BATCH --no-restore --no-save" on the
-current file and show the resulting .Rout file in a new tab. Please see
-|R_routnotab| if you prefer that the file is opened in a new split window.
-Note: The command <LocalLeader>ao silently writes the current buffer to its
-file if it was modified and deletes the .Rout file if it exists.
+Before sending, sweaving or knitting the current buffer, Vim saves it first
+if it has pending changes. <LocalLeader>ao additionally deletes any existing
+.Rout file, then runs "R CMD BATCH --no-restore --no-save" on the file and
+shows the resulting .Rout in a new tab (see |R_routnotab| to open it in a
+split instead).
 
-R syntax uses " <- " to assign values to variables, which is inconvenient to
-type. In Insert mode, typing a single underscore, "_", will write " <- ",
-unless you are typing inside a string. The replacement will always happen if
-syntax highlighting is off (see |:syn-on| and |:syn-off|). If necessary, it is
-possible to insert an actual underscore into your file by typing a second
-underscore. This behavior is similar to the Emacs ESS mode that some users may
-be familiar with and is enabled by default. You have to change the value of
-|R_assign| to disable underscore replacement.
+R's assignment operator, " <- ", is inconvenient to type. In Insert mode, a
+single underscore ("_") expands to " <- ", unless you are inside a string —
+though it always expands if syntax highlighting is off (see |:syn-on| and
+|:syn-off|), since strings can no longer be detected. Type a second
+underscore to insert an actual underscore instead. This mirrors Emacs ESS
+mode and is enabled by default; set |R_assign| to disable it.
 
-When you press <LocalLeader>rh, the plugin shows the help for the function
-under the cursor. The plugin also checks the class of the first object passed
-as an argument to the function to try to figure out whether the function is a
-generic one and whether it is more appropriate to show a specific method. The
-same procedure is followed with <LocalLeader>rp, that is, while printing an
-object. For example, if you run the code below and, then, press
-<LocalLeader>rh and <LocalLeader>rp over the two occurrences of `summary`, the
-plugin will show different help documents and print different function methods
-in each case:
+<LocalLeader>rh shows the help for the function under the cursor;
+<LocalLeader>rp prints an object. Both check the class of the function's
+first argument to decide whether it is a generic and, if so, which specific
+method is more appropriate to show. For example, running the code below and
+then pressing <LocalLeader>rh and <LocalLeader>rp over each occurrence of
+`summary` shows different help documents and prints different method output:
 >r
    y <- rnorm(100)
    x <- rnorm(100)
@@ -496,9 +480,8 @@ in each case:
    summary(x)
    summary(m)
 <
-Vim-R will not check the class of the first object if the `=` operator is
-present. For example, in the two cases below you would get the generic help
-for `summary`:
+Vim-R skips this class check if the `=` operator is used for the argument.
+For example, both cases below get the generic help for `summary`:
 >r
    summary(object = x)
    summary(object = m)
@@ -507,27 +490,20 @@ To get help on an R topic, you can also type in Vim (Normal mode):
 >vim
    :Rhelp topic
 <
-The command may be abbreviated to `:Rh` and you can either press <Tab> to
-trigger the autocompletion of R object names or hit CTRL-D to list the
-possible completions (see |cmdline-completion| for details on the various ways
-of getting command-line completion). The list of objects used for completion
-is the same as the one available for omni completion (see |R_start_libs|). You
-may close the R documentation buffer by simply pressing `q`.
+The command can be abbreviated to `:Rh`; press <Tab> to autocomplete R object
+names or CTRL-D to list completions (see |cmdline-completion|). The
+completion list is the same one used for omni completion (see
+|R_start_libs|). Close the R documentation buffer by pressing `q`.
 
-The command <LocalLeader>td will run `dput()` with the object under the cursor
-as argument and insert the output in a new tab. The command <LocalLeader>rv
-will also run `dput()` with the object under the cursor as argument and show
-the output in a new tab, while <LocalLeader>vs will show it in a horizontal
-split, and <LocalLeader>vv will show it in a vertical split. However, if the
-object under the cursor is a data.frame or a matrix, instead of displaying the
-output of `dput()`, the commands will save the data.frame or matrix in a text
-file with values separated by tab characters and display this file. The
-command <LocalLeader>vh will show the `head()` of the data.frame or matrix in
-a horizontal split that opens above the current window. This behavior can be
-customized, and you can configure Vim-R to call an external application to
-display the data.frame or matrix (see |Vim-R-df-view|). All files involved in
-these operations are created in Vim-R's temporary directory and deleted when
-R quits.
+<LocalLeader>td runs `dput()` on the object under the cursor and inserts the
+output in a new tab. <LocalLeader>rv, vs and vv do the same but display the
+output in a new tab, a horizontal split, or a vertical split, respectively;
+<LocalLeader>vh shows `head()` of the object in a horizontal split above the
+current window instead. If the object is a data.frame or matrix, these
+commands save it as a tab-separated text file and display that instead of
+the `dput()` output. This can be customized to open the data.frame or matrix
+in an external application (see |Vim-R-df-view|). All files involved are
+created in Vim-R's temporary directory and deleted when R quits.
 
 You can source all .R files in a directory with the Normal mode command
 `:RSourceDir`, which accepts an optional argument (the directory to be
@@ -541,23 +517,20 @@ with the `:RKill` command.
 ------------------------------------------------------------------------------
                                                                     *:Rinsert*
                                                                     *:Rformat*
-The command `:Rinsert` <cmd> inserts one or more lines with the output of the
-R command sent to R. By using this command we can avoid the need for copying
-and pasting the R output from its console to Vim. For example, to insert
-the output of `dput(levels(var))`, where `var` is a factor vector, we could do
-in Vim:
+`:Rinsert` <cmd> inserts the output of an R command as one or more lines,
+avoiding the need to copy and paste it from the console. For example, to
+insert the output of `dput(levels(var))`, where `var` is a factor vector:
 >vim
    :Rinsert dput(levels(var))
 <
 The output inserted by `:Rinsert` is limited to 5012 characters.
 
-The command `:Rformat` calls the function `style_text()` (if the package
-`styler` is installed) or the function `tidy_source()` (if the package
-`formatR` is installed) to format either the entire buffer or the selected
-lines. The command only works if R is running. If `style_text()` is used, the
-value of 'shiftwidth' is passed as `indent_by`, and if `tidy_source()` is
-used, the value of the `width.cutoff` argument is set to the buffer's
-'textwidth' if it is within the range 20-180.
+`:Rformat` formats either the entire buffer or the selected lines by calling
+`style_text()` (if the package `styler` is installed) or `tidy_source()` (if
+the package `formatR` is installed); it requires R to be running.
+`style_text()` receives 'shiftwidth' as its `indent_by` argument;
+`tidy_source()` receives the buffer's 'textwidth' as `width.cutoff` when it
+falls within the range 20-180.
 
 See R help on `tidy_source` for details on how to control the function's
 behavior.
@@ -582,13 +555,11 @@ The commands <LocalLeader>cc, ce, cd and ca send the current chunk of R code
 to R Console. The command <LocalLeader>ch sends the R code from the first
 chunk up to the current line.
 
-The command <LocalLeader>kn builds the .tex file from the Rnoweb one using
-the knitr package, and <LocalLeader>kp compiles the pdf; for Sweave, the
-commands are, respectively, <LocalLeader>sw and <LocalLeader>sp. You can jump
-from the Rnoweb file to the PDF (forward search) with the command
-<LocalLeader>gp. The command to jump from a specific location in the PDF to
-the corresponding line in the Rnoweb (backward search) is specific to each PDF
-viewer:
+<LocalLeader>kn builds the .tex file from the Rnoweb source using knitr, and
+<LocalLeader>kp compiles the PDF; for Sweave, the equivalents are
+<LocalLeader>sw and <LocalLeader>sp. <LocalLeader>gp jumps from the Rnoweb
+file to the PDF (forward search). Backward search — from the PDF to the
+corresponding Rnoweb line — depends on the PDF viewer:
 
    Zathura: <C-LeftMouse>
    Evince:  <C-LeftMouse>
@@ -758,12 +729,10 @@ only if a condition is satisfied. Example:
 One limitation is that Vim-R does not help you set breakpoints.
 You have to set them manually as explained above.
 
-Another limitation of Vim-R is that it might be unable to jump to the line in
-the source code that is being evaluated if either you have sent the function
-directly to the R Console or the function has been sent by the `knitr`
-package, without calling the function `source()`. In either case, Vim-R will
-try to find the pattern `funcname <- function(` in the buffer being edited. If
-the pattern is found, the cursor will jump to its position.
+Vim-R may also fail to jump to the line being evaluated if the function was
+sent directly to the R Console or by the `knitr` package, rather than via
+`source()`. In that case, it searches the buffer being edited for the
+pattern `funcname <- function(` and jumps there if found.
 
 The highlighting group used to highlight the line being debugged is the
 QuickFixLine (see |hl-QuickFixLine|). Its foreground and background colors are
@@ -848,16 +817,13 @@ operator. Also, only the current function scope is sent to R. See:
 ------------------------------------------------------------------------------
 5.4. Wrong message that "R is busy" (Windows only)
 
-On Windows, when code is sent from Vim to R Console, the vimcom library
-sets the value of the internal variable `r_is_busy` to 1. The value is set
-back to 0 when any code is successfully evaluated. If you send invalid code to
-R, there will be no successful evaluation of code and, thus, the value of
-`r_is_busy` will remain set to 1. Then, if you try to update the Object
-Browser, see the R documentation for any function, or do other tasks that
-require the hidden evaluation of code by R, the vimcom library will refuse to
-do the tasks to avoid any risk of corrupting R's memory. It will tell Vim
-that "R is busy" and Vim will display this message. Everything should work
-as expected again after any valid code is executed in the R Console.
+On Windows, the vimcom library sets the internal variable `r_is_busy` to 1
+whenever code is sent from Vim to the R Console, and resets it to 0 once
+that code is evaluated successfully. Sending invalid code leaves it stuck at
+1: any task that needs R to silently evaluate code — updating the Object
+Browser, fetching documentation, etc. — is then refused by vimcom, to avoid
+risking R's memory, and Vim shows "R is busy". Everything recovers once any
+valid code runs in the Console.
 
 
 ------------------------------------------------------------------------------
@@ -1046,12 +1012,11 @@ rather that the terminal remains open after R quits, put in your |vimrc|:
 <
                                                                *R_auto_scroll*
 Neovim stops scrolling the R Console automatically if you move the cursor to
-any line that is not the last one. This emulates the behavior of other
-terminal emulators but, considering that (1) R only outputs something after
-we send a command to it, and (2) when we send a command to R we want to see
-its output, Vim-R moves the cursor to the last line of the R Console before
-sending a command, forcing the terminal to scroll. If you prefer to disable
-the auto scrolling, put in your |vimrc| (Neovim only):
+any line that is not the last one, emulating the behavior of other terminal
+emulators. But since R only produces output in response to a command, and we
+want to see that output, Vim-R moves the cursor to the last line of the R
+Console before sending a command, forcing it to scroll. If you prefer to
+disable the auto scrolling, put in your |vimrc| (Neovim only):
 >vim
    let R_auto_scroll = 0
 <
@@ -1548,6 +1513,7 @@ command for them in your |vimrc|, as in the example below:
 >vim
    hi rGlobEnvFun ctermfg=117 guifg=#87d7ff cterm=italic gui=italic
 <
+                                                                    *R_hi_fun*
 If you prefer to completely disable the syntax highlighting of R functions by
 Vim-R, put in your |vimrc|:
 >vim
@@ -2671,10 +2637,10 @@ buffers only. The default <LocalLeader>rf still exists. After changing the
 maps in your |vimrc|, you have to restart Vim. If you want to remove the
 default mappings, you can set |R_user_maps_only|.
 
-Only the custom key bindings for Normal mode are shown in Vim's menu, but
-you can type |:map| to see the complete list of current mappings, and below is
-the list of the names for custom key bindings (the prefix RE means "echo"; RD,
-"cursor down"; RED, both "echo" and "down"):
+Only the custom key bindings for Normal mode are shown in Vim's menu; type
+|:map| to see the complete list. Below are the names for custom key bindings
+(the prefix RE means "echo"; RD, "cursor down"; RED, both "echo" and
+"down"):
 
    Start/Close R:
    RStart
@@ -2796,10 +2762,9 @@ ad-hoc commands to R. This function takes the name of an R function such as
 "levels" or "table" and the word under the cursor, and passes them to R as a
 command.
 
-For example, if your cursor is sitting on top of the object called gender and
-you call the RAction function with an argument such as levels, Vim will
-pass the command `levels(gender)` to R, which will show you the levels of the
-object gender. To make it even easier to use this and other functions, you
+For example, with the cursor over an object called `gender`, calling RAction
+with the argument `"levels"` sends the command `levels(gender)` to R,
+showing its levels. To make this and other functions easier to use, you
 could write custom key bindings in your |vimrc|, as in the examples below:
 >vim
    nmap <silent> <LocalLeader>rk :call RAction("levels")<CR>
