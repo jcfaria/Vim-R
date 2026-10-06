@@ -31,10 +31,11 @@ on your system.
 - For a change risky enough that it shouldn't land on `work` unproven
   (e.g. touching threading, memory safety, or the network protocol in
   `R/vimcom/src/`), branch a temporary `work_xxx` off `work` and advance
-  the work there. Once it succeeds, merge `work_xxx` into `work` — but
-  keep `work_xxx` itself alive and mirrored to the remote as a precaution,
-  rather than deleting it right away. Only once `work` has actually been
-  consolidated into `main` is `work_xxx` pruned, local and remote.
+  the work there, mirrored to the remote as a precaution. Once it
+  succeeds, merge `work_xxx` into `work`, consolidate `work` into `main`
+  (`CPMPW`), and only then prune `work_xxx`, local and remote. If it
+  fails, prune it and resume on `work`. The full cycle, shared by all of
+  the maintainer's projects, is in `README-FLUXO.md`.
 - History on `main` and `work` is not rewritten once pushed — no
   `--amend`, `rebase`, `reset --hard`, or `--force` on a published commit
   — without the maintainer's explicit sign-off on that specific rewrite.

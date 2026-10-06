@@ -14,9 +14,10 @@ writes one of these, in that same message:
 
 - **`CP`** — commit whatever is staged on `work`, then push `work` only.
   `main` is not touched.
-- **`CMPW`** — commit on `work`, merge `work` into `main`, push both
-  branches, then switch back to `work` so day-to-day development
-  continues from there. This is the token that moves `main`.
+- **`CPMPW`** — commit on `work`, push `work`, merge `work` into
+  `main`, push `main`, then switch back to `work` so day-to-day
+  development continues from there. This is the token that moves `main`.
+  The older spellings `CMPW` and `CPMW` mean the same thing.
 - **"podes enviar"** — plain-language equivalent of `CP`.
 
 None of the three authorizes `--force`, tags, or pushing to a fork's own
