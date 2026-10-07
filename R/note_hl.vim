@@ -389,9 +389,14 @@ function RNoteHlApply()
     for [k, v] in items(specs)
         let res[k] = s:Set(k, v)
     endfor
-    let g:rplugin.note_hl = {'base': src, 'bg': bg, 'normal_fg': nfg,
-                \ 'fg_1': strong, 'fg_3': weak, 'ctermfg_base': cbase,
-                \ 'ctermfg_1': cs, 'ctermfg_3': cw, 'status': res}
+    " g:rplugin does not exist if only a file type of R_note_filetypes was
+    " opened, and it must not be created here: common_global.vim initializes it
+    " only if it does not exist yet.
+    if exists("g:rplugin")
+        let g:rplugin.note_hl = {'base': src, 'bg': bg, 'normal_fg': nfg,
+                    \ 'fg_1': strong, 'fg_3': weak, 'ctermfg_base': cbase,
+                    \ 'ctermfg_1': cs, 'ctermfg_3': cw, 'status': res}
+    endif
     return res
 endfunction
 
@@ -418,7 +423,8 @@ augroup VimRNoteHl
     endif
     autocmd ColorScheme * call RNoteHlApply()
     " Comment gets its color only when the syntax is enabled
-    autocmd Syntax r,rmd,quarto,rnoweb,rrst,rhelp call RNoteHlApply()
+    exe 'autocmd Syntax ' . join(['r', 'rmd', 'quarto', 'rnoweb', 'rrst', 'rhelp']
+                \ + g:R_note_filetypes, ',') . ' call RNoteHlApply()'
     " ':set background' triggers ColorScheme only if a colorscheme was loaded
     autocmd OptionSet background call RNoteHlApply()
 augroup END

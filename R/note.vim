@@ -1,11 +1,56 @@
 "==============================================================================
 " Navigation through the note comments "#.", "#.." and "#..." and outline of
 " their hierarchy (see after/syntax/r.vim).
+"
+" Sourced by common_global.vim for the R file types, and by
+" plugin/vimr_notes.vim for the file types in R_note_filetypes, which may be
+" opened before any R file, or in a session where none is ever opened. So this
+" script cannot count on anything that common_global.vim defines, and it is
+" sourced once, whichever of the two comes first.
 "==============================================================================
+
+if exists("*RNoteLevel")
+    finish
+endif
+
+let g:R_note_hl           = get(g:, "R_note_hl",            1)
+let g:R_note_hl_base      = get(g:, "R_note_hl_base", "Comment")
+let g:R_note_hl_amount    = get(g:, "R_note_hl_amount",  0.45)
+let g:R_note_hl_amount3   = get(g:, "R_note_hl_amount3", 0.18)
+let g:R_note_sections     = get(g:, "R_note_sections",      1)
+let g:R_note_folding      = get(g:, "R_note_folding",      [])
+let g:R_note_foldtext     = get(g:, "R_note_foldtext",      1)
+let g:R_note_foldlevel    = get(g:, "R_note_foldlevel",    -1)
+let g:R_note_filetypes    = get(g:, "R_note_filetypes",    [])
+
+if type(g:R_note_folding) == v:t_string
+    let g:R_note_folding = [g:R_note_folding]
+endif
+if type(g:R_note_filetypes) == v:t_string
+    let g:R_note_filetypes = [g:R_note_filetypes]
+endif
+
+if g:R_note_hl
+    exe "source " . fnameescape(expand("<sfile>:p:h") . "/note_hl.vim")
+endif
+
+" RWarningMsg() is defined by common_global.vim, which is not sourced if only
+" a file type of R_note_filetypes was opened.
+function s:Warn(wmsg)
+    if exists("*RWarningMsg")
+        call RWarningMsg(a:wmsg)
+    else
+        echohl WarningMsg
+        echomsg a:wmsg
+        echohl None
+    endif
+endfunction
 
 " Level of a title: 1, 2 or 3, and 0 if the line is not a title. A title is a
 " whole line, unlike the highlighting, which also marks a note written after
 " code, because a fold and a jump can only begin at the start of a line.
+" The section markers of RStudio are an R convention: a buffer of a file type
+" of R_note_filetypes turns them off with b:rplugin_note_sections.
 function RNoteLevel(line)
     if a:line !~ '^#'
         return 0
@@ -16,7 +61,8 @@ function RNoteLevel(line)
         return 2
     elseif a:line =~ '^#\.'
         return 1
-    elseif g:R_note_sections && a:line =~ '[-=#]\{4,}\s*$'
+    elseif get(b:, 'rplugin_note_sections', g:R_note_sections)
+                \ && a:line =~ '[-=#]\{4,}\s*$'
         return 1
     endif
     return 0
@@ -47,7 +93,7 @@ function RNoteGoTo(dir) range
         endif
         let ln += a:dir
     endwhile
-    call RWarningMsg('There is no ' . (a:dir > 0 ? 'next' : 'previous')
+    call s:Warn('There is no ' . (a:dir > 0 ? 'next' : 'previous')
                 \ . ' note to go.')
 endfunction
 
@@ -77,7 +123,7 @@ function RNoteOutline()
         endif
     endfor
     if len(items) == 0
-        call RWarningMsg('There is no note in this buffer.')
+        call s:Warn('There is no note in this buffer.')
         return
     endif
     let what = {'items': items, 'title': 'Notes in ' . expand('%:t')}
@@ -122,10 +168,13 @@ function RNoteSetFolding()
     " nothing to yield to. Testing only the existence used to leave whoever
     " disabled syntax folding by writing 0, instead of deleting the line,
     " with no folding at all.
-    if exists("g:r_syntax_folding") && g:r_syntax_folding
+    " The other file types of R_note_filetypes are not folded by the runtime's
+    " R syntax script.
+    if index(g:R_note_filetypes, &filetype) == -1
+                \ && exists("g:r_syntax_folding") && g:r_syntax_folding
         if !exists("s:said_syntax_folding")
             let s:said_syntax_folding = 1
-            call RWarningMsg('R_note_folding is ignored because '
+            call s:Warn('R_note_folding is ignored because '
                         \ . 'g:r_syntax_folding is enabled. The two are '
                         \ . 'mutually exclusive. Please see Vim-R '
                         \ . 'documentation.')

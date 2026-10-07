@@ -1695,6 +1695,96 @@ run_note_checks() { # run_note_checks <name>
     done
 }
 
+# ------------------------------------- note comments in a non-R file type ---
+
+# R_note_filetypes: the notes of a plain text file, in a session where no R
+# file is opened, so that nothing of common_global.vim is there to lean on,
+# and then an R file opened in the same session, which must neither redefine
+# the functions of note.vim nor lose the notes of R. The editor runs headless,
+# with an rc of its own: the Tmux session of run_editor has an R file open.
+run_note_ft_checks() { # run_note_ft_checks <name> <proj-dir>
+    local name="$1" proj="$2"
+    local d="$proj/noteft"
+    mkdir -p "$d"
+
+    # Line 1 has a "#." in the middle of a word, and line 6 an RStudio section
+    # marker, which is an R convention: neither is a note in a text file.
+    cat > "$d/notes.txt" <<'EOF2'
+Some text with C#.NET in the middle
+#. Section one
+body
+#.. Subsection 1.1
+#... Sub-sub 1.1.1
+# Not a section ----
+#.. Subsection 1.2
+EOF2
+    printf '%s\n' 'x <- 1' '# R section ----' > "$d/notes.R"
+
+    cat > "$d/rc.vim" <<EOF2
+set nocompatible
+set noswapfile nobackup nowritebackup noundofile
+set runtimepath^=$REPO
+set runtimepath+=$REPO/after
+syntax on
+filetype plugin indent on
+let R_note_filetypes = ['text']
+let R_note_folding = ['text']
+let R_auto_start = 0
+EOF2
+
+    cat > "$d/act.vim" <<EOF2
+let s:l = ['loaded ' . exists('g:rplugin') . exists('*RWarningMsg')]
+let s:s = []
+for s:ln in range(1, line('\$'))
+    call add(s:s, synIDattr(synIDtrans(synID(s:ln, 1, 1)), 'name'))
+endfor
+call add(s:l, 'syn ' . join(s:s, ','))
+call add(s:l, 'levels ' . join(map(range(1, line('\$')),
+            \\ 'RNoteLevel(getline(v:val))'), ''))
+call add(s:l, 'folds ' . join(map(range(1, line('\$')),
+            \\ 'foldlevel(v:val)'), ''))
+call add(s:l, 'gs ' . maparg(nr2char(92) . 'gs', 'n'))
+call cursor(1, 1)
+let s:seq = []
+for s:i in range(1, 4)
+    execute 'normal ' . nr2char(92) . 'gs'
+    call add(s:seq, line('.'))
+endfor
+call add(s:l, 'next ' . join(s:seq, ' '))
+set filetype=conf
+call add(s:l, 'undone [' . maparg(nr2char(92) . 'gs', 'n') . '] ' . &l:foldmethod)
+let v:errmsg = ''
+edit notes.R
+call add(s:l, 'r ' . RNoteLevel(getline(2)) . ' ' . exists('g:rplugin.note_hl')
+            \\ . ' [' . v:errmsg . ']')
+call writefile(s:l, '$OUT/noteft.txt')
+qa!
+EOF2
+
+    rm -f "$OUT/noteft.txt"
+    local flags
+    [ "$name" = vim ] && flags=(-es -i NONE) || flags=(--headless -i NONE)
+    (cd "$d" && timeout 60 "$name" -u "$d/rc.vim" "${flags[@]}" -n \
+        -c "source $d/act.vim" notes.txt </dev/null >/dev/null 2>&1)
+
+    local want
+    for want in 'loaded 00' \
+                'syn ,Note_1,,Note_2,Note_3,,Note_2' \
+                'levels 0102302' \
+                'folds 0112332' \
+                'gs :call RNoteGoTo(1)<CR>' \
+                'next 2 4 5 7' \
+                'undone [] manual' \
+                'r 1 1 []'; do
+        if file_has noteft.txt "$want"; then
+            pass "$name: notes in a text file: $want"
+        else
+            fail "$name: the notes of a text file are not '$want'"
+            info "recorded: $(tr '\n' '/' < "$OUT/noteft.txt" 2>/dev/null)"
+        fi
+    done
+}
+
 # ------------------------------------------- bibliographic completion checks --
 
 # Asserts the citation keys, the authors and the years that completion returns.
@@ -1775,6 +1865,7 @@ run_editor() { # run_editor <name> <editor-command...>
 
     # Nothing below depends on R, so it is asserted before R is started.
     run_note_checks "$name"
+    run_note_ft_checks "$name" "$proj"
     run_bib_checks "$name" "$proj"
 
     # SetPDFdir() reads a latexmkrc; no R and no latexmk.

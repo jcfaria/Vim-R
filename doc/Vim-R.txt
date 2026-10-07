@@ -901,6 +901,7 @@ the superfluous command `syntax enable`. For details, see:
 |R_note_folding|        Fold an R script by the levels of its notes
 |R_note_foldtext|       Show the title of a note on the closed fold
 |R_note_foldlevel|      Level down to which a script is folded when opened
+|R_note_filetypes|      Use the note comments in other file types, e.g. text
 |R_routnotab|           Show output of R CMD BATCH in new window
 |R_notmuxconf|          Don't use a specially built Tmux config file
 |R_rconsole_height|     Number of lines of R Console
@@ -1535,8 +1536,9 @@ Besides the usual highlighting of comments, Vim-R highlights three levels of
 
 The whole comment is highlighted, the marker included, and four or more dots
 are still a note of level 3. The notes are also highlighted in the R code
-chunks of Rnoweb, R Markdown and Quarto documents. See |Vim-R-notes| to walk
-the hierarchy that the notes build and to list it.
+chunks of Rnoweb, R Markdown and Quarto documents, and in plain text files
+if you want (see |R_note_filetypes|). See |Vim-R-notes| to walk the hierarchy
+that the notes build and to list it.
 
 The three groups are linked to `Note_1`, `Note_2` and `Note_3`, whose colors
 are not fixed: they are computed from the colorscheme, and recomputed
@@ -2485,7 +2487,8 @@ Example:
 
 The note comments described in |R-note-comments| structure a script
 hierarchically, and Vim-R can walk that hierarchy and show it. In R buffers,
-the following commands are available in Normal mode:
+and in the file types of |R_note_filetypes|, the following commands are
+available in Normal mode:
 
    [count]<LocalLeader>gs : go to the next note
    [count]<LocalLeader>gS : go to the previous note
@@ -2534,10 +2537,12 @@ default; to turn it on, put in your |vimrc|:
 >vim
    let R_note_folding = ['r']
 <
-The value is the list of file types in which the folds are created, and only
-`r` has any effect: in Rnoweb, R Markdown and Quarto documents Vim-R does not
-take 'foldmethod' at all, because the folds would follow the notes of the R
-code chunks and ignore the structure of the document.
+The value is the list of file types in which the folds are created. Among
+the R file types only `r` has any effect: in Rnoweb, R Markdown and Quarto
+documents Vim-R does not take 'foldmethod' at all, because the folds would
+follow the notes of the R code chunks and ignore the structure of the
+document. A file type of |R_note_filetypes| is folded too if it is in the
+list, as in `let R_note_folding = ['r', 'text']`.
 
 'foldmethod' is set only if it still is `manual`, which is its value in R
 buffers unless you changed it, so a global 'foldmethod' of yours, or folding
@@ -2574,6 +2579,30 @@ never set, so disabling syntax folding with a 0 does not cost you the note
 folds. Note that Vim's script still creates its fold regions on the mere
 existence of the variable, so a value of 0 pays for them without getting any
 fold out of them; delete the line to avoid that too.
+                                                            *R_note_filetypes*
+
+The note comments can be used in file types that are not R's, such as plain
+text files, to structure notes, a lecture or a to-do list. Put in your
+|vimrc| the list of file types:
+>vim
+   let R_note_filetypes = ['text']
+<
+In these file types, the notes are highlighted with `Note_1`, `Note_2` and
+`Note_3`, as in R code (see |R-note-comments|), and <LocalLeader>gs,
+<LocalLeader>gS, <LocalLeader>go and `:RNoteOutline` work as described above.
+The buffer is folded by the levels of its notes if its file type is also in
+|R_note_folding|. Nothing else of Vim-R is loaded for these file types: there
+is no connection to R and no completion, and the notes work even if no R
+file is opened in the session.
+
+There are two differences from R code. A note has to begin at the start of
+the line, so that a `#.` in the middle of a sentence is not highlighted; and
+a line ending in four or more `-`, `=` or `#` characters is not a title, as
+|R_note_sections| is a convention of RStudio for R scripts. The R file types
+in the list are ignored, as they always have the notes.
+
+The option is read when Vim starts, so it has to be set in your |vimrc| and
+not later. The default value is an empty list.
 
 ------------------------------------------------------------------------------
 6.41. Diagnostic logging                    *Vim-R-logging* *R_log_channels*
@@ -2795,6 +2824,16 @@ See also: |R_source|.
 
 ==============================================================================
 8. News                                                          *Vim-R-news*
+
+1.0.3 (not released yet)
+
+ * Use the note comments `#.`, `#..` and `#...` in file types that are not
+   R's, such as plain text: the new option R_note_filetypes is the list of
+   those file types, empty by default. They get the highlighting, the
+   navigation with <LocalLeader>gs and <LocalLeader>gS, the outline with
+   <LocalLeader>go and, if they are in R_note_folding too, the folding.
+   Nothing else of Vim-R is loaded for them, and they work in a session where
+   no R file is opened. See |R_note_filetypes|.
 
 1.0.2 (2026-09-16)
 

@@ -905,18 +905,8 @@ let g:R_disable_cmds      = get(g:, "R_disable_cmds",    [''])
 let g:R_enable_comment    = get(g:, "R_enable_comment",     0)
 let g:R_openhtml          = get(g:, "R_openhtml",           1)
 let g:R_hi_fun_paren      = get(g:, "R_hi_fun_paren",       0)
-let g:R_note_hl           = get(g:, "R_note_hl",            1)
-let g:R_note_hl_base      = get(g:, "R_note_hl_base", "Comment")
-let g:R_note_hl_amount    = get(g:, "R_note_hl_amount",  0.45)
-let g:R_note_hl_amount3   = get(g:, "R_note_hl_amount3", 0.18)
-let g:R_note_sections     = get(g:, "R_note_sections",      1)
-let g:R_note_folding      = get(g:, "R_note_folding",      [])
-let g:R_note_foldtext     = get(g:, "R_note_foldtext",      1)
-let g:R_note_foldlevel    = get(g:, "R_note_foldlevel",    -1)
+" The defaults of the R_note_* options are in note.vim (sourced below)
 
-if type(g:R_note_folding) == v:t_string
-    let g:R_note_folding = [g:R_note_folding]
-endif
 let g:R_bib_compl         = get(g:, "R_bib_compl", ["rnoweb"])
 
 if type(g:R_bib_compl) == v:t_string
@@ -1107,10 +1097,8 @@ if g:R_enable_comment
     exe "source " . substitute(g:rplugin.home, " ", "\\ ", "g") . "/R/comment.vim"
 endif
 
-if g:R_note_hl
-    exe "source " . substitute(g:rplugin.home, " ", "\\ ", "g") . "/R/note_hl.vim"
-endif
-
+" It sources note_hl.vim, and does nothing if plugin/vimr_notes.vim already
+" sourced it for a file type of R_note_filetypes.
 exe "source " . substitute(g:rplugin.home, " ", "\\ ", "g") . "/R/note.vim"
 
 if has("gui_running")
