@@ -1720,6 +1720,32 @@ body
 EOF2
     printf '%s\n' 'x <- 1' '# R section ----' > "$d/notes.R"
 
+    # An Rmd document, copied as a qmd one: the folds follow the headers, and
+    # a note in a chunk is a level below its section. The '#' of the YAML
+    # header, of an R comment and of a ~~~ block are neither headers nor notes.
+    cat > "$d/notes.Rmd" <<'EOF2'
+---
+title: "# not a header"
+---
+# Intro
+## Data
+```{r}
+#. Reading
+x <- 1
+#.. Cleaning
+```
+after the chunk
+## Model
+```{r}
+# comment
+```
+~~~
+# inside a block
+~~~
+# End
+EOF2
+    cp "$d/notes.Rmd" "$d/notes.qmd"
+
     cat > "$d/rc.vim" <<EOF2
 set nocompatible
 set noswapfile nobackup nowritebackup noundofile
@@ -1728,7 +1754,7 @@ set runtimepath+=$REPO/after
 syntax on
 filetype plugin indent on
 let R_note_filetypes = ['text']
-let R_note_folding = ['text']
+let R_note_folding = ['text', 'rmd', 'quarto']
 let R_auto_start = 0
 EOF2
 
@@ -1757,6 +1783,15 @@ let v:errmsg = ''
 edit notes.R
 call add(s:l, 'r ' . RNoteLevel(getline(2)) . ' ' . exists('g:rplugin.note_hl')
             \\ . ' [' . v:errmsg . ']')
+for s:f in ['notes.Rmd', 'notes.qmd']
+    execute 'edit ' . s:f
+    call add(s:l, &filetype . ' ' . &l:foldexpr . ' ' . join(map(range(1,
+                \ line('\$')), 'foldlevel(v:val)'), ''))
+    normal! zR
+    7foldclose
+    call add(s:l, &filetype . ' ' . foldclosed(7) . '-' . foldclosedend(7)
+                \ . ' ' . foldtextresult(7))
+endfor
 call writefile(s:l, '$OUT/noteft.txt')
 qa!
 EOF2
@@ -1775,7 +1810,10 @@ EOF2
                 'gs :call RNoteGoTo(1)<CR>' \
                 'next 2 4 5 7' \
                 'undone [] manual' \
-                'r 1 1 []'; do
+                'r 1 1 []' \
+                'rmd RNoteMdFoldExpr(v:lnum) 0001223344222222221' \
+                'rmd 7-10 #. Reading  [4 lines]' \
+                'quarto RNoteMdFoldExpr(v:lnum) 0001223344222222221'; do
         if file_has noteft.txt "$want"; then
             pass "$name: notes in a text file: $want"
         else

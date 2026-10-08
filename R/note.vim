@@ -150,6 +150,62 @@ function RNoteFoldExpr(lnum)
     return lv > 0 ? '>' . lv : '='
 endfunction
 
+" R Markdown and Quarto: the structure of the document is given by its ATX
+" headers, and a note in a code chunk is a level below the header of its
+" section, so that "#." under a "##" is at level 3. Whether a line is in a
+" chunk depends on every line above it, so the levels of the whole buffer are
+" computed in one pass and cached until the next change, instead of walking
+" back from each line that 'foldexpr' is evaluated for.
+function s:MdFoldLevels()
+    let lvs = []
+    let hd = 0
+    let fence = ''
+    let n = line('$')
+    let ln = 1
+    " The '#' of a YAML header is a comment, not a header
+    if getline(1) =~ '^---\s*$'
+        call add(lvs, 0)
+        let ln = 2
+        while ln <= n
+            call add(lvs, 0)
+            let ln += 1
+            if getline(ln - 1) =~ '^\%(---\|\.\.\.\)\s*$'
+                break
+            endif
+        endwhile
+    endif
+    while ln <= n
+        let line = getline(ln)
+        if fence == ''
+            let fence = matchstr(line, '^\s*\zs\%(`\{3,}\|\~\{3,}\)')
+            if fence == '' && line =~ '^#\{1,6}\%(\s\|$\)'
+                let hd = len(matchstr(line, '^#\+'))
+                call add(lvs, '>' . hd)
+            else
+                call add(lvs, hd)
+            endif
+        elseif line =~ '^\s*' . escape(fence[0], '~') . '\{' . len(fence) . ',}\s*$'
+            " The fence still belongs to the note above it; the numeric level
+            " of the line that follows the chunk closes the fold of the note.
+            let fence = ''
+            call add(lvs, '=')
+        else
+            let lv = RNoteLevel(line)
+            call add(lvs, lv > 0 ? '>' . (hd + lv) : '=')
+        endif
+        let ln += 1
+    endwhile
+    return lvs
+endfunction
+
+function RNoteMdFoldExpr(lnum)
+    if get(b:, 'rplugin_md_fold_tick', -1) != b:changedtick
+        let b:rplugin_md_folds = s:MdFoldLevels()
+        let b:rplugin_md_fold_tick = b:changedtick
+    endif
+    return get(b:rplugin_md_folds, a:lnum - 1, '=')
+endfunction
+
 " The default foldtext() drops the '#', which looks like a defect in a lecture
 function RNoteFoldText()
     return substitute(getline(v:foldstart), '\s*$', '', '')
@@ -185,7 +241,11 @@ function RNoteSetFolding()
         return
     endif
     setlocal foldmethod=expr
-    setlocal foldexpr=RNoteFoldExpr(v:lnum)
+    if &filetype == 'rmd' || &filetype == 'quarto'
+        setlocal foldexpr=RNoteMdFoldExpr(v:lnum)
+    else
+        setlocal foldexpr=RNoteFoldExpr(v:lnum)
+    endif
     let undo = 'setlocal foldmethod< foldexpr<'
     if g:R_note_foldtext
         setlocal foldtext=RNoteFoldText()

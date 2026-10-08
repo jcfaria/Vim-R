@@ -898,7 +898,7 @@ the superfluous command `syntax enable`. For details, see:
 |R_note_hl_amount|, |R_note_hl_amount3|  How much a note differs from a comment
 |Vim-R-notes|           Navigation and outline of the note comments
 |R_note_sections|       Recognize the section markers of RStudio
-|R_note_folding|        Fold an R script by the levels of its notes
+|R_note_folding|        Fold a script or an Rmd/Quarto document by levels
 |R_note_foldtext|       Show the title of a note on the closed fold
 |R_note_foldlevel|      Level down to which a script is folded when opened
 |R_note_filetypes|      Use the note comments in other file types, e.g. text
@@ -2537,12 +2537,28 @@ default; to turn it on, put in your |vimrc|:
 >vim
    let R_note_folding = ['r']
 <
-The value is the list of file types in which the folds are created. Among
-the R file types only `r` has any effect: in Rnoweb, R Markdown and Quarto
-documents Vim-R does not take 'foldmethod' at all, because the folds would
-follow the notes of the R code chunks and ignore the structure of the
-document. A file type of |R_note_filetypes| is folded too if it is in the
-list, as in `let R_note_folding = ['r', 'text']`.
+The value is the list of file types in which the folds are created. Besides
+`r`, it may include `rmd` and `quarto`, and the file types of
+|R_note_filetypes|:
+>vim
+   let R_note_folding = ['r', 'rmd', 'quarto', 'text']
+<
+In R Markdown and Quarto documents, the structure of the document is given
+by its headers, so the folds follow the headers `#` to `######` of the text,
+and a note in a code chunk is a level below the header of its section:
+>
+   # Introduction             level 1
+   ## Data                    level 2
+   ```{r}
+   #. Reading                 level 3
+   #.. Cleaning               level 4
+   ```
+   ## Model                   level 2
+<
+The fold of a note ends with its chunk. A `#` in a YAML header, in a code
+chunk or in any other fenced block is not a header, and only the headers
+written with `#` are recognized, not the ones underlined with `=` or `-`.
+Rnoweb documents are not folded.
 
 'foldmethod' is set only if it still is `manual`, which is its value in R
 buffers unless you changed it, so a global 'foldmethod' of yours, or folding
@@ -2834,6 +2850,10 @@ See also: |R_source|.
    <LocalLeader>go and, if they are in R_note_folding too, the folding.
    Nothing else of Vim-R is loaded for them, and they work in a session where
    no R file is opened. See |R_note_filetypes|.
+ * Fold R Markdown and Quarto documents if `rmd` or `quarto` is in
+   R_note_folding: the folds follow the headers of the text, and a note in a
+   code chunk is a level below the header of its section. See
+   |R_note_folding|.
 
 1.0.2 (2026-09-16)
 
