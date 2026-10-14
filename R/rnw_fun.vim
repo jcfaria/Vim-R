@@ -167,7 +167,10 @@ function RWeave(bibtex, knit, pdf)
         let pdfcmd = pdfcmd . ", bibtex = TRUE"
     endif
 
-    if a:pdf == 0 || g:R_openpdf == 0 || b:pdf_is_open
+    " With Zathura, R always hands the PDF back and ROpenPDF() decides (see
+    " there).
+    if a:pdf == 0 || g:R_openpdf == 0
+                \ || (b:pdf_is_open && get(g:rplugin, 'pdfviewer', '') !=# 'zathura')
         let pdfcmd = pdfcmd . ", view = FALSE"
     endif
 

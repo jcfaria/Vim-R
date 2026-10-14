@@ -437,6 +437,14 @@ function ROpenPDF(fullpath)
         return
     endif
 
+    " Zathura's ROpenPDF2() itself finds out whether the PDF is still open, so
+    " that the PDF is opened again if the user closed Zathura, as in R.nvim.
+    " The other viewers rely on b:pdf_is_open.
+    if get(g:rplugin, 'pdfviewer', '') ==# 'zathura'
+        call ROpenPDF2(a:fullpath)
+        return
+    endif
+
     if b:pdf_is_open == 0
         if g:R_openpdf == 1
             let b:pdf_is_open = 1

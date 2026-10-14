@@ -1906,6 +1906,12 @@ that you generate the pdf, you should put in your |vimrc|:
 >vim
    let R_openpdf = 1
 <
+With Zathura, as in R.nvim, a Zathura that is already showing the pdf is
+never closed and started again: it reloads the pdf by itself, and a value
+higher than 1 only raises its window. If you close Zathura, the next
+compilation, or <LocalLeader>op, opens it again, whatever the value of
+`R_openpdf` other than 0.
+
 If you use Linux or another Unix system and occasionally use the system
 console (without the X server), you may want to put in your |vimrc|:
 >vim

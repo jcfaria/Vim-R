@@ -16,43 +16,44 @@ else
     let s:has_dbus_send = 0
 endif
 
-function ROpenPDF2(fullpath)
-    if g:R_openpdf == 1
-        call RStart_Zathura(a:fullpath)
-        return
+" Whether the Zathura that Vim-R started for this PDF is still running. The
+" pid alone is not enough: the system may have given it to another process.
+function s:ZathuraRunning(fullpath)
+    let pid = get(g:rplugin.zathura_pid, a:fullpath, 0)
+    if pid == 0
+        return 0
     endif
+    if system('ps -p ' . pid . ' -o comm=') =~ 'zathura'
+        return 1
+    endif
+    let g:rplugin.zathura_pid[a:fullpath] = 0
+    return 0
+endfunction
 
-    " Time to Zathura reload the PDF
-    sleep 200m
-
+" A running Zathura is never killed and restarted, as in R.nvim: it reloads
+" the PDF by itself when the file changes. R_openpdf > 1 only adds the raising
+" of its window. Restarting it used to be the fallback whenever the window
+" could not be raised, which on Wayland, where Vim-R has no means of raising
+" it, meant a new Zathura at every compilation.
+function ROpenPDF2(fullpath)
     let fname = substitute(a:fullpath, ".*/", "", "")
 
-    " Check if Zathura was already opened and is still running
-    if has_key(g:rplugin.zathura_pid, a:fullpath)
-        if g:rplugin.zathura_pid[a:fullpath] != 0
-            let zrun = system("ps -p " . g:rplugin.zathura_pid[a:fullpath])
-            if zrun =~ g:rplugin.zathura_pid[a:fullpath]
-                if RRaiseWindow(fname)
-                    return
-                else
-                    call RStart_Zathura(a:fullpath)
-                    return
-                endif
-            else
-                let g:rplugin.zathura_pid[a:fullpath] = 0
-                call RStart_Zathura(a:fullpath)
-                return
-            endif
+    if s:ZathuraRunning(a:fullpath)
+        if g:R_openpdf > 1
+            " Time to Zathura reload the PDF
+            sleep 200m
+            call RRaiseWindow(fname)
         endif
-    else
-        let g:rplugin.zathura_pid[a:fullpath] = 0
-    endif
-
-    " Check if Zathura was already running
-    if RRaiseWindow(fname) == 0
-        call RStart_Zathura(a:fullpath)
         return
     endif
+
+    " A Zathura that Vim-R did not start, as one left by a previous session,
+    " may already show the PDF
+    if g:R_openpdf > 1 && RRaiseWindow(fname)
+        return
+    endif
+
+    call RStart_Zathura(a:fullpath)
 endfunction
 
 function SyncTeX_forward2(tpath, ppath, texln, tryagain)
